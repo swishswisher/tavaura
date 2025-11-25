@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tavaura SDK Test</title>
+  </head>
+  <body>
+    <main>
+      <h1>Test Product</h1>
+      <p>$79.00</p>
+      <button name="add">Add to cart</button>
+    </main>
+
+    <script src="path/to/your/bundled/sdk.js"></script>
+    <script>
+      window.Tavaura?.init({
+        tenantId: "demo-tenant-001",
+        debug: true,
+      });
+    </script>
+  </body>
+</html>

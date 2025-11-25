@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tavaura SDK demo</title>
+  </head>
+  <body>
+    <main style="font-family: system-ui, sans-serif; padding: 2rem;">
+      <h1>Tavaura SDK demo</h1>
+      <p>
+        This page simulates how a storefront might embed the Tavaura try-on widget.
+      </p>
+
+      <div id="tavaura-widget" style="margin-top: 1.5rem;"></div>
+
+      <script type="module">
+        import { initTavaura } from "../dist/index.js";
+
+        initTavaura("#tavaura-widget", {
+          tenantId: "demo-tenant",
+          theme: "light",
+          mode: "avatar"
+        });
+      </script>
+    </main>
+  </body>
+</html>
