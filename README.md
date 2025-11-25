@@ -1,6 +1,6 @@
 ﻿# Tavaura — giving aura to your avatar
 
-Tavaura is a virtual try-on platform for apparel and cosmetics that brings photorealistic garment and makeup previews to any brand experience. Brands can embed Tavaura inside their storefronts to let shoppers visualize outfits, accessories, and looks on personalized avatars generated from photos. The platform is designed to be flexible enough for enterprise retailers while still easy to integrate for boutiques and marketplace sellers.
+More explanation on Tavaura coming soon.
 
 ## Repository structure
 
