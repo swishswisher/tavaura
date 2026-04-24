@@ -1,13 +1,14 @@
-﻿using System;
+using System;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Tavaura.Api.Auth;
 
 namespace Tavaura.Api.Tenancy;
 
 /// <summary>
-/// Simple header-based tenant resolution middleware used during early development. Future versions may also inspect
-/// domains, API keys, or session cookies to hydrate the tenant context.
+/// Resolves tenant context from authenticated JWT claims, falling back to development headers for legacy flows.
 /// </summary>
 public class TenantContextMiddleware
 {
@@ -25,11 +26,19 @@ public class TenantContextMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         var tenantContext = context.RequestServices.GetRequiredService<ITenantContext>();
+        var isAuthenticated = context.User.Identity?.IsAuthenticated == true;
+        var role = context.User.FindFirstValue(ClaimTypes.Role) ?? context.User.FindFirstValue("role");
+        var tenantClaim = context.User.FindFirstValue(AuthClaimTypes.TenantId);
 
-        if (context.Request.Headers.TryGetValue(TenantHeader, out var tenantHeader) &&
-            Guid.TryParse(tenantHeader, out var tenantId))
+        if (isAuthenticated && Guid.TryParse(tenantClaim, out var authenticatedTenantId))
         {
-            tenantContext.TenantId = tenantId;
+            tenantContext.TenantId = authenticatedTenantId;
+        }
+        else if ((!isAuthenticated || role == AuthRoles.PlatformAdmin) &&
+                 context.Request.Headers.TryGetValue(TenantHeader, out var tenantHeader) &&
+                 Guid.TryParse(tenantHeader, out var headerTenantId))
+        {
+            tenantContext.TenantId = headerTenantId;
         }
 
         if (context.Request.Headers.TryGetValue(PlatformHeader, out var platformHeader))
@@ -45,4 +54,3 @@ public class TenantContextMiddleware
         await _next(context);
     }
 }
-

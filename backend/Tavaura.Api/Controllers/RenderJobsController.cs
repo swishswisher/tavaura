@@ -1,0 +1,140 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Tavaura.Api.Auth;
+using Tavaura.Api.Data;
+using Tavaura.Api.Domain.Entities;
+using Tavaura.Api.Models.Jobs;
+using Tavaura.Api.Tenancy;
+
+namespace Tavaura.Api.Controllers;
+
+[ApiController]
+[Route("api/render-jobs")]
+[Authorize(Roles = AuthRoles.CustomerMerchantOrPlatform)]
+public class RenderJobsController : ControllerBase
+{
+    private readonly TavauraDbContext _dbContext;
+    private readonly ITenantContext _tenantContext;
+
+    public RenderJobsController(TavauraDbContext dbContext, ITenantContext tenantContext)
+    {
+        _dbContext = dbContext;
+        _tenantContext = tenantContext;
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<RenderJobResponse>> CreateAsync(
+        [FromBody] CreateRenderJobRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!_tenantContext.TenantId.HasValue)
+        {
+            return BadRequest(new { message = "Missing tenant context." });
+        }
+
+        if (request.AvatarId == Guid.Empty)
+        {
+            return BadRequest(new { message = "AvatarId is required." });
+        }
+
+        if (request.GarmentId == Guid.Empty)
+        {
+            return BadRequest(new { message = "GarmentId is required." });
+        }
+
+        var tenantId = _tenantContext.TenantId.Value;
+        var avatar = await _dbContext.Avatars.FirstOrDefaultAsync(a => a.Id == request.AvatarId, cancellationToken);
+        if (avatar is null)
+        {
+            return BadRequest(new { message = "Avatar does not exist." });
+        }
+
+        if (avatar.TenantId.HasValue && avatar.TenantId.Value != tenantId)
+        {
+            return BadRequest(new { message = "Avatar does not belong to this tenant." });
+        }
+
+        if (User.IsInRole(AuthRoles.CustomerUser) &&
+            !string.Equals(
+                User.FindFirstValue(ClaimTypes.NameIdentifier),
+                avatar.UserId.ToString(),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return Forbid();
+        }
+
+        var garment = await _dbContext.Garments.FirstOrDefaultAsync(
+            g => g.Id == request.GarmentId && g.TenantId == tenantId,
+            cancellationToken);
+        if (garment is null)
+        {
+            return BadRequest(new { message = "Garment does not exist for this tenant." });
+        }
+
+        var garmentAsset = await _dbContext.GarmentAssets
+            .Where(ga => ga.TenantId == tenantId && ga.GarmentId == garment.Id)
+            .OrderByDescending(ga => ga.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (garmentAsset is null)
+        {
+            return BadRequest(new { message = "Garment has no processed asset. Queue and complete ingestion first." });
+        }
+
+        if (string.IsNullOrWhiteSpace(garmentAsset.ProcessedMaskUrl) ||
+            string.IsNullOrWhiteSpace(garmentAsset.ProcessedTextureUrl))
+        {
+            return BadRequest(new { message = "Garment asset is missing processed output URLs. Queue and complete ingestion first." });
+        }
+
+        var assetVersion = await _dbContext.AssetVersions
+            .Where(av => av.GarmentAssetId == garmentAsset.Id)
+            .OrderByDescending(av => av.VersionNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (assetVersion is null)
+        {
+            return BadRequest(new { message = "Garment asset has no asset version. Queue and complete ingestion first." });
+        }
+
+        var now = DateTime.UtcNow;
+        var renderJob = new RenderJob
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            AvatarId = avatar.Id,
+            GarmentAssetId = garmentAsset.Id,
+            AssetVersionId = assetVersion.Id,
+            Status = "pending",
+            AttemptCount = 0,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        _dbContext.RenderJobs.Add(renderJob);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = ToRenderJobResponse(renderJob, garment.Id);
+        return Created($"/api/render-jobs/{renderJob.Id}", response);
+    }
+
+    private static RenderJobResponse ToRenderJobResponse(RenderJob renderJob, Guid garmentId)
+    {
+        return new RenderJobResponse
+        {
+            Id = renderJob.Id,
+            TenantId = renderJob.TenantId,
+            AvatarId = renderJob.AvatarId,
+            GarmentId = garmentId,
+            GarmentAssetId = renderJob.GarmentAssetId,
+            AssetVersionId = renderJob.AssetVersionId,
+            Status = renderJob.Status,
+            AttemptCount = renderJob.AttemptCount,
+            ErrorMessage = renderJob.ErrorMessage,
+            StartedAt = renderJob.StartedAt,
+            CompletedAt = renderJob.CompletedAt,
+            CreatedAt = renderJob.CreatedAt,
+            UpdatedAt = renderJob.UpdatedAt
+        };
+    }
+}
