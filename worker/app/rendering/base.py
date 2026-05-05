@@ -21,6 +21,7 @@ class RenderRequest:
     external_product_id: str
     garment_name: str
     garment_source_image_url: str
+    garment_processed_image_url: str
     requested_asset_version_id: uuid.UUID
     latest_asset_version_id: uuid.UUID
     latest_version_number: int
@@ -44,4 +45,3 @@ class RenderProviderResult:
 class RenderProvider(Protocol):
     async def render(self, request: RenderRequest) -> RenderProviderResult:
         ...
-

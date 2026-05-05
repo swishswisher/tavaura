@@ -7,7 +7,7 @@ from html import escape
 
 import asyncpg
 
-from app.services.background_removal import download_image, removeBackground
+from app.services.background_removal import download_image, process_image_bytes
 from app.storage.minio_storage import MinioAssetStorage, StoredObject
 
 
@@ -110,22 +110,17 @@ async def _process_ingestion_job(
         raise ValueError("Garment is missing SourceImageUrl.")
 
     downloaded_source_image = await download_image(source_image_url)
-    transparent_image_content: bytes | None = None
-    try:
-        transparent_image_content = await removeBackground(downloaded_source_image.content)
-    except Exception:
-        LOGGER.exception(
-            "Background removal failed for garment %s in ingestion job %s. Continuing without ProcessedImageUrl.",
-            garment["Id"],
-            job.id,
-        )
+    downloaded_image_bytes = downloaded_source_image.content
+    print(f"[INGESTION] Downloaded image size: {len(downloaded_image_bytes)} bytes")
+    processed_bytes = process_image_bytes(downloaded_image_bytes)
+    print(f"[INGESTION] Processed image size: {len(processed_bytes)} bytes")
 
     processed_image_object, mask_object, texture_object = await _upload_ingestion_assets(
         storage,
         job,
         garment["Id"],
         source_image_url,
-        transparent_image_content,
+        processed_bytes,
     )
 
     async with pool.acquire() as connection:
@@ -145,6 +140,7 @@ async def _process_ingestion_job(
             now = datetime.now(UTC)
             if garment_asset is None:
                 garment_asset_id = uuid.uuid4()
+                processed_image_url = processed_image_object.url if processed_image_object is not None else None
                 await connection.execute(
                     """
                     INSERT INTO "GarmentAssets"
@@ -159,12 +155,14 @@ async def _process_ingestion_job(
                     garment["Id"],
                     "front",
                     source_image_url,
-                    processed_image_object.url if processed_image_object is not None else None,
+                    processed_image_url,
                     mask_object.url,
                     texture_object.url,
                     0.5,
                     now,
                 )
+                if processed_image_url:
+                    LOGGER.info("Saved ProcessedImageUrl: %s", processed_image_url)
             else:
                 garment_asset_id = garment_asset["Id"]
                 processed_image_url = (
@@ -189,6 +187,8 @@ async def _process_ingestion_job(
                     texture_object.url,
                     0.5,
                 )
+                if processed_image_url:
+                    LOGGER.info("Saved ProcessedImageUrl: %s", processed_image_url)
 
             next_version_number = await connection.fetchval(
                 """
@@ -258,11 +258,17 @@ async def _upload_ingestion_assets(
     base_key = f"ingestion/{job.tenant_id}/{job.id}"
     processed_image_object: StoredObject | None = None
     if processed_image_content is not None:
-        processed_image_object = await storage.upload_bytes(
-            key=f"processed/{garment_id}.png",
-            content=processed_image_content,
-            content_type=PROCESSED_IMAGE_CONTENT_TYPE,
-        )
+        try:
+            LOGGER.info("Uploading processed image...")
+            LOGGER.info("Uploading processed image for garment %s", garment_id)
+            processed_image_object = await storage.upload_bytes(
+                key=f"processed/{garment_id}.png",
+                content=processed_image_content,
+                content_type=PROCESSED_IMAGE_CONTENT_TYPE,
+            )
+            LOGGER.info("Uploaded processed image for garment %s: %s", garment_id, processed_image_object.url)
+        except Exception:
+            LOGGER.exception("Processed image upload failed for garment %s", garment_id)
     mask_content = _build_placeholder_mask_svg(job, garment_id, source_image_url)
     texture_content = _build_placeholder_texture_svg(job, garment_id, source_image_url)
 

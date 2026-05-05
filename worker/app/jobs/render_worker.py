@@ -51,6 +51,7 @@ class GarmentRenderInput:
     external_product_id: str
     name: str
     source_image_url: str
+    processed_image_url: str
     processed_mask_url: str
     processed_texture_url: str
     latest_asset_version_id: uuid.UUID
@@ -245,6 +246,7 @@ async def _load_garment_input(
                ga."TenantId",
                ga."GarmentId",
                ga."SourceImageUrl",
+               ga."ProcessedImageUrl",
                ga."ProcessedMaskUrl",
                ga."ProcessedTextureUrl",
                g."ExternalProductId",
@@ -279,6 +281,9 @@ async def _load_garment_input(
     if row["RequestedAssetVersionId"] is None:
         raise ValueError("Render job AssetVersionId is not linked to the garment asset.")
 
+    if not row["ProcessedImageUrl"] or not str(row["ProcessedImageUrl"]).strip():
+        raise ValueError("Garment asset is missing ProcessedImageUrl.")
+
     if not row["ProcessedMaskUrl"] or not str(row["ProcessedMaskUrl"]).strip():
         raise ValueError("Garment asset is missing ProcessedMaskUrl.")
 
@@ -292,6 +297,7 @@ async def _load_garment_input(
         external_product_id=row["ExternalProductId"] or "",
         name=row["Name"] or "",
         source_image_url=row["SourceImageUrl"] or "",
+        processed_image_url=row["ProcessedImageUrl"],
         processed_mask_url=row["ProcessedMaskUrl"],
         processed_texture_url=row["ProcessedTextureUrl"],
         latest_asset_version_id=row["LatestAssetVersionId"],
@@ -323,6 +329,7 @@ def _build_render_request(
         external_product_id=garment.external_product_id,
         garment_name=garment.name,
         garment_source_image_url=garment.source_image_url,
+        garment_processed_image_url=garment.processed_image_url,
         requested_asset_version_id=job.asset_version_id,
         latest_asset_version_id=garment.latest_asset_version_id,
         latest_version_number=garment.latest_version_number,
@@ -336,15 +343,14 @@ async def _upload_render_outputs(
     job: ClaimedRenderJob,
     render_result: RenderProviderResult,
 ) -> tuple[StoredObject, StoredObject]:
-    base_key = f"renders/{job.tenant_id}/{job.id}"
-
     output_object = await storage.upload_bytes(
-        key=f"{base_key}/{render_result.output.filename}",
+        key=f"renders/{job.id}.png",
         content=render_result.output.content,
         content_type=render_result.output.content_type,
     )
+    LOGGER.info("Uploaded render output %s", output_object.url)
     preview_object = await storage.upload_bytes(
-        key=f"{base_key}/{render_result.preview.filename}",
+        key=f"renders/{job.id}-preview.png",
         content=render_result.preview.content,
         content_type=render_result.preview.content_type,
     )

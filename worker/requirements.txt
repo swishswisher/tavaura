@@ -1,5 +1,6 @@
-asyncpg==0.30.0
+﻿asyncpg==0.30.0
 fastapi==0.116.1
 minio==7.2.15
+pillow==12.2.0
 requests==2.32.3
 uvicorn[standard]==0.35.0

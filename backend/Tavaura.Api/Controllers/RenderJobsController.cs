@@ -25,6 +25,7 @@ public class RenderJobsController : ControllerBase
     }
 
     [HttpPost]
+    [HttpPost("/api/admin/render-jobs")]
     public async Task<ActionResult<RenderJobResponse>> CreateAsync(
         [FromBody] CreateRenderJobRequest request,
         CancellationToken cancellationToken)
@@ -34,18 +35,15 @@ public class RenderJobsController : ControllerBase
             return BadRequest(new { message = "Missing tenant context." });
         }
 
-        if (request.AvatarId == Guid.Empty)
-        {
-            return BadRequest(new { message = "AvatarId is required." });
-        }
-
         if (request.GarmentId == Guid.Empty)
         {
             return BadRequest(new { message = "GarmentId is required." });
         }
 
         var tenantId = _tenantContext.TenantId.Value;
-        var avatar = await _dbContext.Avatars.FirstOrDefaultAsync(a => a.Id == request.AvatarId, cancellationToken);
+        var avatar = request.AvatarId == Guid.Empty
+            ? await GetOrCreateDefaultAvatarAsync(request.AvatarImageUrl, tenantId, cancellationToken)
+            : await _dbContext.Avatars.FirstOrDefaultAsync(a => a.Id == request.AvatarId, cancellationToken);
         if (avatar is null)
         {
             return BadRequest(new { message = "Avatar does not exist." });
@@ -82,6 +80,11 @@ public class RenderJobsController : ControllerBase
             return BadRequest(new { message = "Garment has no processed asset. Queue and complete ingestion first." });
         }
 
+        if (string.IsNullOrWhiteSpace(garmentAsset.ProcessedImageUrl))
+        {
+            return BadRequest(new { message = "Garment asset is missing processed image output. Queue and complete ingestion first." });
+        }
+
         if (string.IsNullOrWhiteSpace(garmentAsset.ProcessedMaskUrl) ||
             string.IsNullOrWhiteSpace(garmentAsset.ProcessedTextureUrl))
         {
@@ -116,6 +119,53 @@ public class RenderJobsController : ControllerBase
 
         var response = ToRenderJobResponse(renderJob, garment.Id);
         return Created($"/api/render-jobs/{renderJob.Id}", response);
+    }
+
+    private async Task<Avatar?> GetOrCreateDefaultAvatarAsync(
+        string? avatarImageUrl,
+        Guid tenantId,
+        CancellationToken cancellationToken)
+    {
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdValue, out var userId))
+        {
+            return null;
+        }
+
+        var source = string.IsNullOrWhiteSpace(avatarImageUrl)
+            ? "tavaura-default-avatar"
+            : avatarImageUrl.Trim();
+
+        var existingAvatar = await _dbContext.Avatars
+            .Where(a => a.UserId == userId && a.TenantId == tenantId && a.Source == source)
+            .OrderByDescending(a => a.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (existingAvatar is not null)
+        {
+            return existingAvatar;
+        }
+
+        var now = DateTime.UtcNow;
+        var avatar = new Avatar
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TenantId = tenantId,
+            Source = source,
+            HeightCm = 172,
+            WeightKg = 70,
+            Age = 30,
+            Gender = "unspecified",
+            IsPregnant = false,
+            SkinTone = "neutral",
+            SmplParametersJson = "{}",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        _dbContext.Avatars.Add(avatar);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return avatar;
     }
 
     private static RenderJobResponse ToRenderJobResponse(RenderJob renderJob, Guid garmentId)
