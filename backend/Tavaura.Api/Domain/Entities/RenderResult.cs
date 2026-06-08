@@ -12,5 +12,9 @@ public class RenderResult
 
     public string PreviewImageUrl { get; set; } = string.Empty;
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

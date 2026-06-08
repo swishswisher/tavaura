@@ -20,6 +20,7 @@ class RenderRequest:
     garment_id: uuid.UUID
     external_product_id: str
     garment_name: str
+    garment_layer: str
     garment_source_image_url: str
     garment_processed_image_url: str
     requested_asset_version_id: uuid.UUID

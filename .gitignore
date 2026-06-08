@@ -42,6 +42,8 @@ env/
 .python-version
 .pytest_cache/
 .mypy_cache/
+worker/avatar_pipeline/smpl/models/
+worker/avatar_pipeline/smplx/models/
 
 # Environment & secrets
 .env
@@ -61,4 +63,3 @@ Thumbs.db
 *.log
 *.tmp
 *.swp
-

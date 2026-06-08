@@ -49,15 +49,14 @@ public class IngestionJobsController : ControllerBase
 
         var rows = await (
             from ingestionJob in ingestionJobsQuery
-            join garment in _dbContext.Garments.AsNoTracking().Where(g => g.TenantId == tenantId)
-                on ingestionJob.ExternalProductId equals garment.ExternalProductId into garmentJoin
-            from garment in garmentJoin.DefaultIfEmpty()
+            join garment in _dbContext.Garments.AsNoTracking().Where(g => g.TenantId == tenantId && g.IsActive && !g.IsDeleted)
+                on ingestionJob.ExternalProductId equals garment.ExternalProductId
             orderby ingestionJob.CreatedAt descending
             select new IngestionJobListItemResponse
             {
                 Id = ingestionJob.Id,
-                GarmentId = garment != null ? garment.Id : null,
-                GarmentName = garment != null ? garment.Name : ingestionJob.ExternalProductId,
+                GarmentId = garment.Id,
+                GarmentName = garment.Name,
                 ExternalProductId = ingestionJob.ExternalProductId,
                 Status = ingestionJob.Status,
                 AttemptCount = ingestionJob.AttemptCount,
@@ -89,7 +88,7 @@ public class IngestionJobsController : ControllerBase
 
         var tenantId = _tenantContext.TenantId.Value;
         var garment = await _dbContext.Garments.FirstOrDefaultAsync(
-            g => g.Id == request.GarmentId && g.TenantId == tenantId,
+            g => g.Id == request.GarmentId && g.TenantId == tenantId && g.IsActive && !g.IsDeleted,
             cancellationToken);
         if (garment is null)
         {

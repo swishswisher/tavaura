@@ -3,9 +3,10 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from html import escape
+from io import BytesIO
 
 import asyncpg
+from PIL import Image, ImageDraw
 
 from app.services.background_removal import download_image, process_image_bytes
 from app.storage.minio_storage import MinioAssetStorage, StoredObject
@@ -15,7 +16,7 @@ LOGGER = logging.getLogger("tavaura.worker.ingestion")
 POLL_INTERVAL_SECONDS = 1
 PROCESSING_DELAY_SECONDS = 2
 PLACEHOLDER_PROCESSING_MODEL = "ingestion-skeleton-v1"
-PLACEHOLDER_CONTENT_TYPE = "image/svg+xml"
+PLACEHOLDER_CONTENT_TYPE = "image/png"
 PROCESSED_IMAGE_CONTENT_TYPE = "image/png"
 
 
@@ -236,6 +237,7 @@ async def _get_garment_for_ingestion(
             SELECT "Id", "SourceImageUrl"
             FROM "Garments"
             WHERE "TenantId" = $1 AND "ExternalProductId" = $2
+              AND "IsDeleted" = FALSE
             LIMIT 1
             """,
             job.tenant_id,
@@ -269,16 +271,16 @@ async def _upload_ingestion_assets(
             LOGGER.info("Uploaded processed image for garment %s: %s", garment_id, processed_image_object.url)
         except Exception:
             LOGGER.exception("Processed image upload failed for garment %s", garment_id)
-    mask_content = _build_placeholder_mask_svg(job, garment_id, source_image_url)
-    texture_content = _build_placeholder_texture_svg(job, garment_id, source_image_url)
+    mask_content = _build_placeholder_mask_png()
+    texture_content = _build_placeholder_texture_png()
 
     mask_object = await storage.upload_bytes(
-        key=f"{base_key}/mask.svg",
+        key=f"{base_key}/mask.png",
         content=mask_content,
         content_type=PLACEHOLDER_CONTENT_TYPE,
     )
     texture_object = await storage.upload_bytes(
-        key=f"{base_key}/texture.svg",
+        key=f"{base_key}/texture.png",
         content=texture_content,
         content_type=PLACEHOLDER_CONTENT_TYPE,
     )
@@ -286,58 +288,31 @@ async def _upload_ingestion_assets(
     return processed_image_object, mask_object, texture_object
 
 
-def _build_placeholder_mask_svg(
-    job: ClaimedIngestionJob,
-    garment_id: uuid.UUID,
-    source_image_url: str,
-) -> bytes:
-    metadata = _build_svg_metadata(job, garment_id, source_image_url)
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <title>Tavaura placeholder garment mask</title>
-  <desc>{metadata}</desc>
-  <rect width="512" height="512" fill="#050505"/>
-  <ellipse cx="256" cy="250" rx="150" ry="212" fill="#ffffff"/>
-  <rect x="164" y="366" width="184" height="82" rx="36" fill="#ffffff"/>
-  <text x="256" y="486" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#ffffff">placeholder mask</text>
-</svg>
-""".encode("utf-8")
+def _build_placeholder_mask_png() -> bytes:
+    image = Image.new("RGBA", (512, 512), "#050505")
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((106, 38, 406, 462), fill="#ffffff")
+    draw.rounded_rectangle((164, 366, 348, 448), radius=36, fill="#ffffff")
+    return _save_png(image)
 
 
-def _build_placeholder_texture_svg(
-    job: ClaimedIngestionJob,
-    garment_id: uuid.UUID,
-    source_image_url: str,
-) -> bytes:
-    metadata = _build_svg_metadata(job, garment_id, source_image_url)
-    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <title>Tavaura placeholder garment texture</title>
-  <desc>{metadata}</desc>
-  <defs>
-    <pattern id="checker" width="64" height="64" patternUnits="userSpaceOnUse">
-      <rect width="64" height="64" fill="#d8c7ff"/>
-      <rect width="32" height="32" fill="#7c3aed"/>
-      <rect x="32" y="32" width="32" height="32" fill="#7c3aed"/>
-    </pattern>
-  </defs>
-  <rect width="512" height="512" fill="url(#checker)"/>
-  <path d="M118 88h276l-44 344H162L118 88Z" fill="#f8fafc" fill-opacity="0.58"/>
-  <text x="256" y="486" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#111827">placeholder texture</text>
-</svg>
-""".encode("utf-8")
+def _build_placeholder_texture_png() -> bytes:
+    image = Image.new("RGBA", (512, 512), "#f8fafc")
+    draw = ImageDraw.Draw(image)
+
+    for y in range(0, 512, 64):
+        for x in range(0, 512, 64):
+            color = "#f4efe7" if (x + y) // 64 % 2 == 0 else "#d9c6aa"
+            draw.rectangle((x, y, x + 63, y + 63), fill=color)
+
+    draw.polygon(((118, 88), (394, 88), (350, 432), (162, 432)), fill="#ffffff99")
+    return _save_png(image)
 
 
-def _build_svg_metadata(
-    job: ClaimedIngestionJob,
-    garment_id: uuid.UUID,
-    source_image_url: str,
-) -> str:
-    return escape(
-        (
-            f"job_id={job.id}; tenant_id={job.tenant_id}; "
-            f"garment_id={garment_id}; source_image_url={source_image_url}"
-        ),
-        quote=True,
-    )
+def _save_png(image: Image.Image) -> bytes:
+    output = BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
 
 
 async def _fail_ingestion_job(pool: asyncpg.Pool, job_id: uuid.UUID, error_message: str) -> None:

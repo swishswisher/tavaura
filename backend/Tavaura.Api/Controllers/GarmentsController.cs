@@ -40,7 +40,7 @@ public class GarmentsController : ControllerBase
 
         var tenantId = _tenantContext.TenantId.Value;
         var garments = await _dbContext.Garments
-            .Where(g => g.TenantId == tenantId && g.IsActive)
+            .Where(g => g.TenantId == tenantId && g.IsActive && !g.IsDeleted)
             .OrderByDescending(g => g.CreatedAt)
             .ToListAsync(cancellationToken);
 
@@ -59,7 +59,7 @@ public class GarmentsController : ControllerBase
 
         var tenantId = _tenantContext.TenantId.Value;
         var garment = await _dbContext.Garments.FirstOrDefaultAsync(
-            g => g.Id == garmentId && g.TenantId == tenantId && g.IsActive,
+            g => g.Id == garmentId && g.TenantId == tenantId && g.IsActive && !g.IsDeleted,
             cancellationToken);
         if (garment is null)
         {
@@ -133,6 +133,7 @@ public class GarmentsController : ControllerBase
             Layer = request.Layer.Trim(),
             SourceImageUrl = request.SourceImageUrl.Trim(),
             IsActive = true,
+            IsDeleted = false,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -155,15 +156,18 @@ public class GarmentsController : ControllerBase
 
         var tenantId = _tenantContext.TenantId.Value;
         var garment = await _dbContext.Garments.FirstOrDefaultAsync(
-            g => g.Id == garmentId && g.TenantId == tenantId && g.IsActive,
+            g => g.Id == garmentId && g.TenantId == tenantId && g.IsActive && !g.IsDeleted,
             cancellationToken);
         if (garment is null)
         {
             return NotFound(new { message = "Garment was not found for this tenant." });
         }
 
+        var now = DateTime.UtcNow;
         garment.IsActive = false;
-        garment.UpdatedAt = DateTime.UtcNow;
+        garment.IsDeleted = true;
+        garment.DeletedAt = now;
+        garment.UpdatedAt = now;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();
@@ -183,6 +187,11 @@ public class GarmentsController : ControllerBase
             g => g.TenantId == tenantId && g.ExternalProductId == request.ExternalProductId,
             cancellationToken);
 
+        if (garment is not null && garment.IsDeleted)
+        {
+            return Conflict(new { message = "This garment has been deleted and cannot be reactivated by ingestion." });
+        }
+
         if (garment is null)
         {
             garment = new Garment
@@ -195,6 +204,7 @@ public class GarmentsController : ControllerBase
                 Layer = request.Layer,
                 SourceImageUrl = request.SourceImageUrl,
                 IsActive = true,
+                IsDeleted = false,
                 CreatedAt = now,
                 UpdatedAt = now
             };
@@ -329,7 +339,7 @@ public class GarmentsController : ControllerBase
         bool hasProcessedAsset,
         IngestionJob? latestJob)
     {
-        if (!garment.IsActive)
+        if (garment.IsDeleted || !garment.IsActive)
         {
             return "deleted";
         }

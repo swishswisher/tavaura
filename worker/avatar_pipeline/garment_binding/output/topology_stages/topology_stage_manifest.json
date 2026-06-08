@@ -1,0 +1,162 @@
+[
+  {
+    "stage": "raw_primitives",
+    "source": "prefit",
+    "description": "Current generator output before fitting.",
+    "metrics": {
+      "connected_component_count": 1,
+      "component_face_counts": [
+        3256
+      ],
+      "is_watertight": false,
+      "is_winding_consistent": false,
+      "boundary_edge_count": 164,
+      "nonmanifold_edge_count": 0,
+      "average_edge_valence": 1.9669754329440194,
+      "vertex_count": 1804,
+      "triangle_count": 3256,
+      "disconnected_seam_clusters": 4,
+      "degenerate_triangle_count": 0
+    }
+  },
+  {
+    "stage": "after_welding",
+    "source": "prefit",
+    "description": "No separate welding stage is exposed; mirrors pre-fit mesh.",
+    "metrics": {
+      "connected_component_count": 1,
+      "component_face_counts": [
+        3256
+      ],
+      "is_watertight": false,
+      "is_winding_consistent": false,
+      "boundary_edge_count": 164,
+      "nonmanifold_edge_count": 0,
+      "average_edge_valence": 1.9669754329440194,
+      "vertex_count": 1804,
+      "triangle_count": 3256,
+      "disconnected_seam_clusters": 4,
+      "degenerate_triangle_count": 0
+    }
+  },
+  {
+    "stage": "after_seam_bridging",
+    "source": "prefit",
+    "description": "Current seam-bridged mesh before fitting.",
+    "metrics": {
+      "connected_component_count": 1,
+      "component_face_counts": [
+        3256
+      ],
+      "is_watertight": false,
+      "is_winding_consistent": false,
+      "boundary_edge_count": 164,
+      "nonmanifold_edge_count": 0,
+      "average_edge_valence": 1.9669754329440194,
+      "vertex_count": 1804,
+      "triangle_count": 3256,
+      "disconnected_seam_clusters": 4,
+      "degenerate_triangle_count": 0
+    }
+  },
+  {
+    "stage": "after_smoothing",
+    "source": "prefit",
+    "description": "No separate smoothing stage is exposed; mirrors pre-fit mesh.",
+    "metrics": {
+      "connected_component_count": 1,
+      "component_face_counts": [
+        3256
+      ],
+      "is_watertight": false,
+      "is_winding_consistent": false,
+      "boundary_edge_count": 164,
+      "nonmanifold_edge_count": 0,
+      "average_edge_valence": 1.9669754329440194,
+      "vertex_count": 1804,
+      "triangle_count": 3256,
+      "disconnected_seam_clusters": 4,
+      "degenerate_triangle_count": 0
+    }
+  },
+  {
+    "stage": "after_remeshing",
+    "source": "prefit",
+    "description": "No remeshing stage is currently present; mirrors pre-fit mesh.",
+    "metrics": {
+      "connected_component_count": 1,
+      "component_face_counts": [
+        3256
+      ],
+      "is_watertight": false,
+      "is_winding_consistent": false,
+      "boundary_edge_count": 164,
+      "nonmanifold_edge_count": 0,
+      "average_edge_valence": 1.9669754329440194,
+      "vertex_count": 1804,
+      "triangle_count": 3256,
+      "disconnected_seam_clusters": 4,
+      "degenerate_triangle_count": 0
+    }
+  },
+  {
+    "stage": "after_fitting",
+    "source": "fitted",
+    "description": "Mesh after surface_fit.fit_garment_to_body.",
+    "metrics": {
+      "connected_component_count": 1,
+      "component_face_counts": [
+        3256
+      ],
+      "is_watertight": false,
+      "is_winding_consistent": false,
+      "boundary_edge_count": 164,
+      "nonmanifold_edge_count": 0,
+      "average_edge_valence": 1.9669754329440194,
+      "vertex_count": 1804,
+      "triangle_count": 3256,
+      "disconnected_seam_clusters": 4,
+      "degenerate_triangle_count": 0
+    }
+  },
+  {
+    "stage": "after_shrinkwrap",
+    "source": "fitted",
+    "description": "No separate shrinkwrap stage is exposed; mirrors fitted mesh.",
+    "metrics": {
+      "connected_component_count": 1,
+      "component_face_counts": [
+        3256
+      ],
+      "is_watertight": false,
+      "is_winding_consistent": false,
+      "boundary_edge_count": 164,
+      "nonmanifold_edge_count": 0,
+      "average_edge_valence": 1.9669754329440194,
+      "vertex_count": 1804,
+      "triangle_count": 3256,
+      "disconnected_seam_clusters": 4,
+      "degenerate_triangle_count": 0
+    }
+  },
+  {
+    "stage": "final_output",
+    "source": "fitted",
+    "description": "Final garment mesh used by current binding tests.",
+    "metrics": {
+      "connected_component_count": 1,
+      "component_face_counts": [
+        3256
+      ],
+      "is_watertight": false,
+      "is_winding_consistent": false,
+      "boundary_edge_count": 164,
+      "nonmanifold_edge_count": 0,
+      "average_edge_valence": 1.9669754329440194,
+      "vertex_count": 1804,
+      "triangle_count": 3256,
+      "disconnected_seam_clusters": 4,
+      "degenerate_triangle_count": 0
+    }
+  }
+]

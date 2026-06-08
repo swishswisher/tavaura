@@ -38,7 +38,7 @@ public class RenderResultsController : ControllerBase
 
         var renderJobsQuery = _dbContext.RenderJobs
             .AsNoTracking()
-            .Where(rj => rj.TenantId == tenantId);
+            .Where(rj => rj.TenantId == tenantId && !rj.IsDeleted);
 
         if (User.IsInRole(AuthRoles.CustomerUser))
         {
@@ -53,12 +53,12 @@ public class RenderResultsController : ControllerBase
 
         var rows = await renderJobsQuery
             .Join(
-                _dbContext.GarmentAssets.AsNoTracking(),
+                _dbContext.GarmentAssets.AsNoTracking().Where(ga => ga.TenantId == tenantId),
                 rj => rj.GarmentAssetId,
                 ga => ga.Id,
                 (rj, ga) => new { RenderJob = rj, GarmentAsset = ga })
             .Join(
-                _dbContext.Garments.AsNoTracking(),
+                _dbContext.Garments.AsNoTracking().Where(g => g.TenantId == tenantId && g.IsActive && !g.IsDeleted),
                 x => x.GarmentAsset.GarmentId,
                 g => g.Id,
                 (x, g) => new
@@ -66,7 +66,7 @@ public class RenderResultsController : ControllerBase
                     x.RenderJob,
                     GarmentName = g.Name,
                     LatestResult = _dbContext.RenderResults
-                        .Where(rr => rr.RenderJobId == x.RenderJob.Id)
+                        .Where(rr => rr.RenderJobId == x.RenderJob.Id && !rr.IsDeleted)
                         .OrderByDescending(rr => rr.CreatedAt)
                         .Select(rr => new
                         {
@@ -108,9 +108,23 @@ public class RenderResultsController : ControllerBase
 
         var tenantId = _tenantContext.TenantId.Value;
         var renderJob = await _dbContext.RenderJobs.FirstOrDefaultAsync(
-            rj => rj.Id == jobId && rj.TenantId == tenantId,
+            rj => rj.Id == jobId && rj.TenantId == tenantId && !rj.IsDeleted,
             cancellationToken);
         if (renderJob is null)
+        {
+            return NotFound(new { message = "Render job was not found for this tenant." });
+        }
+
+        var garmentIsVisible = await _dbContext.GarmentAssets
+            .AsNoTracking()
+            .Where(ga => ga.Id == renderJob.GarmentAssetId && ga.TenantId == tenantId)
+            .Join(
+                _dbContext.Garments.AsNoTracking().Where(g => g.TenantId == tenantId && g.IsActive && !g.IsDeleted),
+                ga => ga.GarmentId,
+                g => g.Id,
+                (_, _) => true)
+            .AnyAsync(cancellationToken);
+        if (!garmentIsVisible)
         {
             return NotFound(new { message = "Render job was not found for this tenant." });
         }
@@ -131,7 +145,7 @@ public class RenderResultsController : ControllerBase
         }
 
         var renderResult = await _dbContext.RenderResults
-            .Where(rr => rr.RenderJobId == renderJob.Id)
+            .Where(rr => rr.RenderJobId == renderJob.Id && !rr.IsDeleted)
             .OrderByDescending(rr => rr.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
         if (renderResult is null)
@@ -157,5 +171,58 @@ public class RenderResultsController : ControllerBase
             PreviewImageUrl = renderResult.PreviewImageUrl,
             CreatedAt = renderResult.CreatedAt
         });
+    }
+
+    [HttpDelete("{jobId:guid}")]
+    public async Task<IActionResult> DeleteAsync(
+        Guid jobId,
+        CancellationToken cancellationToken)
+    {
+        if (!_tenantContext.TenantId.HasValue)
+        {
+            return BadRequest(new { message = "Missing tenant context." });
+        }
+
+        var tenantId = _tenantContext.TenantId.Value;
+        var renderJob = await _dbContext.RenderJobs.FirstOrDefaultAsync(
+            rj => rj.Id == jobId && rj.TenantId == tenantId && !rj.IsDeleted,
+            cancellationToken);
+        if (renderJob is null)
+        {
+            return NotFound(new { message = "Render job was not found for this tenant." });
+        }
+
+        if (User.IsInRole(AuthRoles.CustomerUser))
+        {
+            var avatar = await _dbContext.Avatars.FirstOrDefaultAsync(
+                a => a.Id == renderJob.AvatarId,
+                cancellationToken);
+            if (avatar is null ||
+                !string.Equals(
+                    User.FindFirstValue(ClaimTypes.NameIdentifier),
+                    avatar.UserId.ToString(),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return Forbid();
+            }
+        }
+
+        var now = DateTime.UtcNow;
+        renderJob.IsDeleted = true;
+        renderJob.DeletedAt = now;
+        renderJob.UpdatedAt = now;
+
+        var renderResult = await _dbContext.RenderResults
+            .Where(rr => rr.RenderJobId == renderJob.Id && !rr.IsDeleted)
+            .OrderByDescending(rr => rr.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (renderResult is not null)
+        {
+            renderResult.IsDeleted = true;
+            renderResult.DeletedAt = now;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 }

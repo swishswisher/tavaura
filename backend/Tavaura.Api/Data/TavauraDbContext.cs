@@ -56,6 +56,18 @@ public class TavauraDbContext : DbContext
             .HasIndex(g => new { g.TenantId, g.ExternalProductId })
             .IsUnique();
 
+        modelBuilder.Entity<Garment>()
+            .Property(g => g.IsDeleted)
+            .HasDefaultValue(false);
+
+        modelBuilder.Entity<RenderJob>()
+            .Property(rj => rj.IsDeleted)
+            .HasDefaultValue(false);
+
+        modelBuilder.Entity<RenderResult>()
+            .Property(rr => rr.IsDeleted)
+            .HasDefaultValue(false);
+
         modelBuilder.Entity<AssetVersion>()
             .HasIndex(av => new { av.GarmentAssetId, av.VersionNumber })
             .IsDescending(false, true)

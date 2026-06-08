@@ -306,21 +306,40 @@ public class AdminSettingsController : ControllerBase
 
         var garmentsProcessedThisMonth = await _dbContext.GarmentAssets
             .AsNoTracking()
+            .Join(
+                _dbContext.Garments.AsNoTracking().Where(g => g.TenantId == tenant.Id && g.IsActive && !g.IsDeleted),
+                ga => ga.GarmentId,
+                g => g.Id,
+                (ga, _) => ga)
             .CountAsync(ga =>
-                ga.TenantId == tenant.Id &&
-                ga.CreatedAt >= monthStart &&
-                !string.IsNullOrWhiteSpace(ga.ProcessedMaskUrl) &&
-                !string.IsNullOrWhiteSpace(ga.ProcessedTextureUrl),
+                    ga.TenantId == tenant.Id &&
+                    ga.CreatedAt >= monthStart &&
+                    !string.IsNullOrWhiteSpace(ga.ProcessedMaskUrl) &&
+                    !string.IsNullOrWhiteSpace(ga.ProcessedTextureUrl),
                 cancellationToken);
+
+        var visibleRenderJobs = _dbContext.RenderJobs
+            .AsNoTracking()
+            .Where(rj => rj.TenantId == tenant.Id && !rj.IsDeleted)
+            .Join(
+                _dbContext.GarmentAssets.AsNoTracking().Where(ga => ga.TenantId == tenant.Id),
+                rj => rj.GarmentAssetId,
+                ga => ga.Id,
+                (rj, ga) => new { RenderJob = rj, ga.GarmentId })
+            .Join(
+                _dbContext.Garments.AsNoTracking().Where(g => g.TenantId == tenant.Id && g.IsActive && !g.IsDeleted),
+                x => x.GarmentId,
+                g => g.Id,
+                (x, _) => x.RenderJob);
 
         var rendersThisMonth = await _dbContext.RenderResults
             .AsNoTracking()
             .Join(
-                _dbContext.RenderJobs.AsNoTracking().Where(rj => rj.TenantId == tenant.Id),
+                visibleRenderJobs,
                 rr => rr.RenderJobId,
                 rj => rj.Id,
                 (rr, _) => rr)
-            .CountAsync(rr => rr.CreatedAt >= monthStart, cancellationToken);
+            .CountAsync(rr => rr.CreatedAt >= monthStart && !rr.IsDeleted, cancellationToken);
 
         return new AdminSettingsResponse
         {

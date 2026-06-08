@@ -37,7 +37,7 @@ public class AdminDashboardController : ControllerBase
 
         var allGarmentLookup = await _dbContext.Garments
             .AsNoTracking()
-            .Where(g => g.TenantId == tenantId)
+            .Where(g => g.TenantId == tenantId && g.IsActive && !g.IsDeleted)
             .Select(g => new
             {
                 g.Id,
@@ -48,7 +48,7 @@ public class AdminDashboardController : ControllerBase
 
         var activeGarments = await _dbContext.Garments
             .AsNoTracking()
-            .Where(g => g.TenantId == tenantId && g.IsActive)
+            .Where(g => g.TenantId == tenantId && g.IsActive && !g.IsDeleted)
             .Select(g => new
             {
                 g.Id,
@@ -138,18 +138,30 @@ public class AdminDashboardController : ControllerBase
             }
         }
 
-        var totalRenders = await _dbContext.RenderJobs
+        var visibleRenderJobs = _dbContext.RenderJobs
             .AsNoTracking()
-            .CountAsync(rj => rj.TenantId == tenantId, cancellationToken);
+            .Where(rj => rj.TenantId == tenantId && !rj.IsDeleted)
+            .Join(
+                _dbContext.GarmentAssets.AsNoTracking().Where(ga => ga.TenantId == tenantId),
+                rj => rj.GarmentAssetId,
+                ga => ga.Id,
+                (rj, ga) => new { RenderJob = rj, ga.GarmentId })
+            .Join(
+                _dbContext.Garments.AsNoTracking().Where(g => g.TenantId == tenantId && g.IsActive && !g.IsDeleted),
+                x => x.GarmentId,
+                g => g.Id,
+                (x, _) => x.RenderJob);
+
+        var totalRenders = await visibleRenderJobs.CountAsync(cancellationToken);
 
         var recentResults = await _dbContext.RenderResults
             .AsNoTracking()
             .Join(
-                _dbContext.RenderJobs.AsNoTracking().Where(rj => rj.TenantId == tenantId),
+                visibleRenderJobs,
                 rr => rr.RenderJobId,
                 rj => rj.Id,
                 (rr, _) => rr)
-            .CountAsync(rr => rr.CreatedAt >= recentWindowStart, cancellationToken);
+            .CountAsync(rr => rr.CreatedAt >= recentWindowStart && !rr.IsDeleted, cancellationToken);
 
         var externalProductLookup = allGarmentLookup
             .GroupBy(g => g.ExternalProductId, StringComparer.Ordinal)
@@ -173,6 +185,7 @@ public class AdminDashboardController : ControllerBase
             .AsNoTracking()
             .Where(ij =>
                 ij.TenantId == tenantId &&
+                activeExternalProductIds.Contains(ij.ExternalProductId) &&
                 (ij.Status == "completed" || ij.Status == "failed"))
             .OrderByDescending(ij => ij.CompletedAt ?? ij.UpdatedAt)
             .Take(20)
@@ -206,6 +219,7 @@ public class AdminDashboardController : ControllerBase
             .AsNoTracking()
             .Where(rj =>
                 rj.TenantId == tenantId &&
+                !rj.IsDeleted &&
                 (rj.Status == "completed" || rj.Status == "failed"))
             .Join(
                 _dbContext.GarmentAssets.AsNoTracking().Where(ga => ga.TenantId == tenantId),
@@ -219,7 +233,7 @@ public class AdminDashboardController : ControllerBase
                     ga.GarmentId
                 })
             .Join(
-                _dbContext.Garments.AsNoTracking().Where(g => g.TenantId == tenantId),
+                _dbContext.Garments.AsNoTracking().Where(g => g.TenantId == tenantId && g.IsActive && !g.IsDeleted),
                 x => x.GarmentId,
                 g => g.Id,
                 (x, g) => new
@@ -267,9 +281,7 @@ public class AdminDashboardController : ControllerBase
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var latestRenderJob = await _dbContext.RenderJobs
-            .AsNoTracking()
-            .Where(rj => rj.TenantId == tenantId)
+        var latestRenderJob = await visibleRenderJobs
             .OrderByDescending(rj => rj.UpdatedAt)
             .Select(rj => new
             {

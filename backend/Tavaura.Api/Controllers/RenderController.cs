@@ -49,7 +49,7 @@ public class RenderController : ControllerBase
             from garment in _dbContext.Garments.AsNoTracking()
             join asset in _dbContext.GarmentAssets.AsNoTracking()
                 on garment.Id equals asset.GarmentId
-            where garment.Id == garmentId && garment.IsActive
+            where garment.Id == garmentId && garment.IsActive && !garment.IsDeleted
             orderby asset.CreatedAt descending
             select new
             {
@@ -186,6 +186,7 @@ public class RenderController : ControllerBase
             AssetVersionId = request.AssetVersionId,
             Status = "pending",
             AttemptCount = 0,
+            IsDeleted = false,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -225,6 +226,7 @@ public class RenderController : ControllerBase
                 RenderJobId = renderJob.Id,
                 OutputImageUrl = workerResponse.RenderOutputUrl,
                 PreviewImageUrl = workerResponse.PreviewOutputUrl,
+                IsDeleted = false,
                 CreatedAt = DateTime.UtcNow
             };
 

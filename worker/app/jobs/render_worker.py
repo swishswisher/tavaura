@@ -18,6 +18,8 @@ POLL_INTERVAL_SECONDS = 1
 SIMULATED_WORK_SECONDS = 2
 RENDER_PROVIDER_ENV = "RENDER_PROVIDER"
 DEFAULT_RENDER_PROVIDER = "mock"
+PNG_CONTENT_TYPE = "image/png"
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
 @dataclass(frozen=True)
@@ -50,6 +52,7 @@ class GarmentRenderInput:
     garment_id: uuid.UUID
     external_product_id: str
     name: str
+    layer: str
     source_image_url: str
     processed_image_url: str
     processed_mask_url: str
@@ -98,6 +101,7 @@ async def _claim_pending_render_job(pool: asyncpg.Pool) -> ClaimedRenderJob | No
                 SELECT "Id", "TenantId", "AvatarId", "GarmentAssetId", "AssetVersionId"
                 FROM "RenderJobs"
                 WHERE "Status" = 'pending'
+                  AND "IsDeleted" = FALSE
                 ORDER BY "CreatedAt"
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
@@ -143,6 +147,7 @@ async def _process_render_job(
 
     render_inputs = await _load_render_inputs(pool, job)
     render_result = await render_provider.render(_build_render_request(job, render_inputs))
+    _validate_png_render_result(render_result)
     output_object, preview_object = await _upload_render_outputs(
         storage,
         job,
@@ -160,6 +165,7 @@ async def _process_render_job(
 def _create_render_provider() -> RenderProvider:
     provider_name = os.getenv(RENDER_PROVIDER_ENV, DEFAULT_RENDER_PROVIDER).strip().lower()
     if provider_name == "mock":
+        LOGGER.info("Using NEW render pipeline (Pillow PNG)")
         return MockRenderProvider()
 
     raise ValueError(f"Unsupported {RENDER_PROVIDER_ENV}: {provider_name}")
@@ -177,6 +183,18 @@ def _validate_render_job(job: ClaimedRenderJob) -> None:
 
     if job.asset_version_id is None:
         raise ValueError("Render job is missing AssetVersionId.")
+
+
+def _validate_png_render_result(render_result: RenderProviderResult) -> None:
+    for label, artifact in (
+        ("output", render_result.output),
+        ("preview", render_result.preview),
+    ):
+        if artifact.content_type != PNG_CONTENT_TYPE:
+            raise ValueError(f"Render provider returned non-PNG {label} artifact.")
+
+        if not artifact.content or not artifact.content.startswith(PNG_SIGNATURE):
+            raise ValueError(f"Render provider returned invalid {label} PNG content.")
 
 
 async def _load_render_inputs(
@@ -251,6 +269,7 @@ async def _load_garment_input(
                ga."ProcessedTextureUrl",
                g."ExternalProductId",
                g."Name",
+               g."Layer",
                requested_av."Id" AS "RequestedAssetVersionId",
                latest_av."Id" AS "LatestAssetVersionId",
                latest_av."VersionNumber" AS "LatestVersionNumber"
@@ -268,6 +287,8 @@ async def _load_garment_input(
         ) latest_av ON true
         WHERE ga."Id" = $1
           AND ga."TenantId" = $2
+          AND g."IsDeleted" = FALSE
+          AND g."IsActive" = TRUE
         LIMIT 1
         """,
         job.garment_asset_id,
@@ -296,6 +317,7 @@ async def _load_garment_input(
         garment_id=row["GarmentId"],
         external_product_id=row["ExternalProductId"] or "",
         name=row["Name"] or "",
+        layer=row["Layer"] or "",
         source_image_url=row["SourceImageUrl"] or "",
         processed_image_url=row["ProcessedImageUrl"],
         processed_mask_url=row["ProcessedMaskUrl"],
@@ -328,6 +350,7 @@ def _build_render_request(
         garment_id=garment.garment_id,
         external_product_id=garment.external_product_id,
         garment_name=garment.name,
+        garment_layer=garment.layer,
         garment_source_image_url=garment.source_image_url,
         garment_processed_image_url=garment.processed_image_url,
         requested_asset_version_id=job.asset_version_id,
@@ -346,13 +369,13 @@ async def _upload_render_outputs(
     output_object = await storage.upload_bytes(
         key=f"renders/{job.id}.png",
         content=render_result.output.content,
-        content_type=render_result.output.content_type,
+        content_type=PNG_CONTENT_TYPE,
     )
     LOGGER.info("Uploaded render output %s", output_object.url)
     preview_object = await storage.upload_bytes(
         key=f"renders/{job.id}-preview.png",
         content=render_result.preview.content,
-        content_type=render_result.preview.content_type,
+        content_type=PNG_CONTENT_TYPE,
     )
 
     return output_object, preview_object

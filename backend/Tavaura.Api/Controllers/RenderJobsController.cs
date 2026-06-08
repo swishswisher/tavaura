@@ -64,7 +64,7 @@ public class RenderJobsController : ControllerBase
         }
 
         var garment = await _dbContext.Garments.FirstOrDefaultAsync(
-            g => g.Id == request.GarmentId && g.TenantId == tenantId,
+            g => g.Id == request.GarmentId && g.TenantId == tenantId && g.IsActive && !g.IsDeleted,
             cancellationToken);
         if (garment is null)
         {
@@ -110,6 +110,7 @@ public class RenderJobsController : ControllerBase
             AssetVersionId = assetVersion.Id,
             Status = "pending",
             AttemptCount = 0,
+            IsDeleted = false,
             CreatedAt = now,
             UpdatedAt = now
         };
