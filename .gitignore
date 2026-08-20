@@ -6,11 +6,9 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
-npm-shrinkwrap.json
-yarn.lock
 .pnp/
 .next/
+.tmp/
 .turbo/
 .vercel/
 dist/
@@ -31,6 +29,8 @@ obj/
 *.suo
 project.lock.json
 artifacts/
+.buildcheck/
+*.lscache
 
 # Python
 __pycache__/
@@ -44,6 +44,7 @@ env/
 .mypy_cache/
 worker/avatar_pipeline/smpl/models/
 worker/avatar_pipeline/smplx/models/
+worker/avatar_pipeline/**/output*/
 
 # Environment & secrets
 .env

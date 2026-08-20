@@ -23,6 +23,7 @@ These files supersede conflicting or outdated plans from earlier development
 conversations:
 
 - [Current implementation state](docs/CURRENT_STATE.md)
+- [Repository setup and clean-checkout contract](docs/REPOSITORY_SETUP.md)
 - [MVP definition of done](docs/MVP_DEFINITION_OF_DONE.md)
 - [Implementation roadmap](docs/IMPLEMENTATION_ROADMAP.md)
 - [Architecture overview](docs/architecture-overview.md)
