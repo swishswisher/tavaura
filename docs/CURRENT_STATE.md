@@ -1,0 +1,297 @@
+# Tavaura Current State
+
+Status: **canonical implementation snapshot**
+
+Reconciled: **2026-08-20**
+
+Checkout reviewed: **`007bb3e` on `master`**
+
+Working tree at verification: **clean before Phase 0 documentation edits**
+
+## How to read this document
+
+This file records what exists in the local repository, not what an older plan
+said should exist.
+
+Evidence labels:
+
+- **Code verified** — inspected in the current checkout.
+- **Test verified** — a relevant build or test was run on 2026-08-20.
+- **Conversation checkpoint** — established in the project history but not
+  independently reproducible from source code alone.
+- **Planned** — accepted direction that is not implemented.
+
+The seven linked project histories were reconciled in full at the text level:
+1,019 turns. Attached-image pixels and omitted attachment bodies are not
+available through the conversation reader, so screenshot-only observations are
+never represented as code-verified facts.
+
+## Locked product state
+
+- Tavaura is an SDK-first multi-tenant virtual try-on SaaS.
+- The MVP output is 2.5D near-realism.
+- True 3D SMPL-X infrastructure supplies body geometry, proportions and pose.
+- Heavy garment preparation happens during ingestion, not at shopper runtime.
+- Runtime returns a fast structured preview before optional realism enhancement.
+- Both reusable generated avatars and a bounded photo-based path are in scope.
+- The MVP optimizes for believable commercial output, not perfect digital twins.
+- A known-good canonical garment is validated before catalog automation is built.
+
+These decisions are detailed in [the ADR index](decisions/README.md).
+
+## Repository integrity
+
+| Area | State | Evidence |
+|---|---|---|
+| Root repository | Active Git repository at `007bb3e` | Code verified |
+| Frontend ownership | Stored as gitlink `160000` to `479e25...` | Code verified |
+| Submodule configuration | `.gitmodules` is absent | Code verified |
+| Frontend local files | Present, but not tracked as ordinary root files | Code verified |
+| Lockfiles | Present locally; ignored and not tracked | Code verified |
+| Generated outputs | Many R&D PNG/OBJ artifacts are tracked | Code verified |
+| Backend build artifacts | Compiled/generated artifacts exist in repository history | Code verified |
+| CI/CD | No repository CI workflow | Code verified |
+| App containers | Compose provides infrastructure only | Code verified |
+
+The broken frontend gitlink is a launch blocker because a fresh clone cannot
+reconstruct the current frontend source.
+
+## Verification performed
+
+### Passed on 2026-08-20
+
+- `dotnet build backend/Tavaura.sln --no-restore`
+  - zero warnings
+  - zero errors
+- `npm run build` in `frontend/`
+  - successful production build
+  - non-fatal warnings for one unused catch variable and raw `<img>` usage
+- `npm run build` in `sdk/`
+  - TypeScript build successful
+- Python compilation for `worker/app`
+- body-estimation tests
+- canonical T-shirt topology test
+  - one connected component
+  - zero boundary edges
+  - zero non-manifold edges
+  - 5,936 vertices
+  - 11,868 faces
+
+### Known quality gaps
+
+- There is no backend test project.
+- There are no frontend, SDK, API integration or end-to-end tests.
+- Full recursive Python compilation includes legacy Python 2 SMPL research code
+  and is not clean.
+- Visual R&D outputs are not governed by measurable commercial-quality gates.
+- No production deployment or recovery test exists.
+
+## Component status
+
+### Frontend
+
+**Implemented — code/test verified**
+
+- marketing site and product/audience pages
+- merchant admin pages for garments, ingestion, renders and settings
+- admin login flow and authenticated API client utilities
+- shopper widget and SDK demo page
+- photo upload preview and sample garment-selection UI
+- signup route and page
+
+**Partial or simulated**
+
+- widget garment previews use missing or demo assets
+- homepage photo processing calls a backend route that is not implemented
+- shopper try-on is not connected to the SMPL-X pipeline
+- signup lead storage is process-local
+- JWT storage uses browser local storage
+
+**Missing**
+
+- production storefront session flow
+- product/variant-aware SDK invocation
+- render progress and progressive-result UX
+- privacy consent/deletion flow
+- automated tests and telemetry
+- Three.js or another 3D viewer dependency
+
+### Backend
+
+**Implemented — code/build verified**
+
+- ASP.NET Core API and EF Core/PostgreSQL configuration
+- JWT issuance and validation with token-version revocation
+- role-based authorization on newer controllers
+- tenants, users, avatars, garments, garment assets and job/result entities
+- ingestion/render job and result APIs
+- merchant admin dashboard/settings APIs
+- migrations and basic database constraints/indexes
+- tenant predicates in the newer controller queries
+
+**Partial**
+
+- account, store and membership ownership entities exist but are not coherently
+  connected to the existing Tenant boundary
+- tenant isolation relies mainly on controller predicates
+- asset versions are numbered but do not contain immutable artifact manifests
+- plan usage is displayed but not enforced
+- API keys and webhook settings are stored but not operational integrations
+
+**Critical gaps**
+
+- unauthenticated merchant registration can assign `merchant_admin` for an
+  existing tenant
+- legacy ingestion/render routes are public
+- remote media downloads permit SSRF
+- no global tenant query filters or PostgreSQL row-level security
+- no unique normalized-email database constraint
+- plaintext API keys are stored and repeatedly returned
+- no rate limiting, invitation flow, MFA, lockout or refresh-token lifecycle
+
+### Worker runtime
+
+**Implemented — code/test verified**
+
+- FastAPI service with health endpoint
+- PostgreSQL job consumers using `FOR UPDATE SKIP LOCKED`
+- ingestion and render job state transitions
+- MinIO-compatible object upload
+- provider interface for runtime rendering
+- Pillow-based mock output and preview generation
+
+**Partial**
+
+- attempt counts exist, but there is no retry schedule or recovery policy
+- asset version rows exist, but URLs remain mutable on `GarmentAsset`
+- processed uploads, placeholder masks and placeholder textures are produced
+- workers run inside the FastAPI application lifespan
+
+**Missing**
+
+- job leases, heartbeat, abandoned-job reaper and dead-letter handling
+- safe-download service and network egress restrictions
+- real background removal, segmentation and classification
+- canonical-archetype selection and deformation
+- immutable raw/processed asset manifests and hashes
+- automated QC and merchant review workflow
+- runtime SMPL-X render provider
+- progressive enhancement provider
+
+### SMPL-X and garment R&D
+
+**Implemented — code/test verified**
+
+- SMPL-X model loading and mesh export scripts
+- beta calibration and mesh measurement utilities
+- deterministic parameter-to-beta estimation
+- morphology amplification and curated body archetypes
+- pose calibration and reusable pose definitions
+- procedural T-shirt topology generation
+- garment semantic regions and surface fitting
+- render/debug outputs across bodies and poses
+
+**Important interpretation**
+
+This is an offline research and validation package. It is not invoked by the
+runtime render worker. The production render path still defaults to
+`MockRenderProvider`, which uses Pillow.
+
+**Quality state**
+
+- topology/connectivity checks pass
+- body and pose variation works
+- procedural garments are not yet commercial-quality cloth assets
+- there is no cloth physics, production material/UV pipeline or runtime bridge
+- body estimation is deterministic heuristic mapping, not photo inference
+
+### Marvelous Designer canonical garment
+
+**Conversation checkpoint plus local artifact**
+
+- Local project: `worker/avatar_pipeline/smplx/assets/tvra.zprj`
+- T-shirt front, back and sleeve panels were created with reasonable dimensions.
+- The latest conversation established that scale was not the blocker.
+- The immediate task was arranging the panels around the SMPL-X avatar before
+  sewing/simulation validation.
+
+The final draped garment, export settings and cross-body validation are not yet
+recorded as completed.
+
+### Garment ingestion data model
+
+**Already present**
+
+- tenant-aware Garment records and external product IDs
+- queued IngestionJob records with status, attempts and timestamps
+- GarmentAsset records
+- numbered AssetVersion records
+- MinIO object upload
+- placeholder processed image, mask and texture locations
+
+**Not yet present**
+
+- products and variants as first-class catalog records
+- immutable raw-media records, hashes, dimensions and provenance
+- safe fetch/quarantine
+- real classification and segmentation
+- archetype identity, measurements and deformation metadata
+- immutable version manifest containing every artifact/model parameter
+- confidence gates and merchant review state
+- publish/unpublish lifecycle
+- catalog connectors and synchronization
+- outbox events and webhook delivery records
+
+### SDK
+
+**Implemented — code/build verified**
+
+- standalone TypeScript SDK package
+- separate frontend loader capable of injecting a CTA and opening an iframe
+
+**Architecture drift**
+
+- two competing implementations
+- inconsistent initialization and CDN documentation
+- no product/variant identifier in the effective contract
+- no signed storefront session or allowed-origin enforcement
+- no secure `postMessage` protocol
+- unsandboxed iframe with broad permissions
+- no stable versioned release process
+
+## Current runtime flow
+
+### Working database-queue path
+
+```text
+Admin/API creates ingestion or render job
+  -> Python worker polls PostgreSQL
+  -> worker claims pending job with SKIP LOCKED
+  -> mock processing/rendering
+  -> MinIO upload
+  -> PostgreSQL status/result update
+```
+
+### Broken legacy path
+
+The backend worker clients POST to `/jobs/ingestion/mock` and
+`/jobs/render/mock`, but FastAPI exposes only `/health`. These legacy routes
+must be removed rather than repaired unless a concrete synchronous use case is
+approved.
+
+## Dependency and licensing state
+
+- Frontend is pinned to Next.js `15.5.6`; it requires immediate security patching
+  and a planned move to the Active LTS line.
+- Backend targets `.NET 8`; move to .NET 10 LTS before launch.
+- Worker pins `requests==2.32.3`; update beyond the known affected version.
+- `minio/minio:latest` is unpinned.
+- SMPL-X/R&D dependencies are not declared in the production requirements file.
+- The full SMPL-X model/software is non-commercial by default; commercial
+  rights must be confirmed before commercial launch.
+
+## Immediate next phase
+
+Phase 1 is repository and security stabilization. Canonical garment work may
+continue in parallel as a manual R&D activity, but no public MVP deployment is
+allowed until the Phase 1 security and repository exit criteria are met.
