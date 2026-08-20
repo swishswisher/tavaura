@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { Package } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type GarmentImageProps = {
   name: string;
@@ -46,13 +46,10 @@ export function GarmentImage({
   initialsClassName,
 }: GarmentImageProps) {
   const normalizedImageUrl = imageUrl?.trim();
-  const [hasImageError, setHasImageError] = useState(false);
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const initials = useMemo(() => getInitials(name), [name]);
-  const shouldShowImage = Boolean(normalizedImageUrl) && !hasImageError;
-
-  useEffect(() => {
-    setHasImageError(false);
-  }, [normalizedImageUrl]);
+  const shouldShowImage =
+    Boolean(normalizedImageUrl) && failedImageUrl !== normalizedImageUrl;
 
   return (
     <div
@@ -65,7 +62,7 @@ export function GarmentImage({
         <img
           src={normalizedImageUrl}
           alt={alt ?? name}
-          onError={() => setHasImageError(true)}
+          onError={() => setFailedImageUrl(normalizedImageUrl ?? null)}
           className={cx("h-full w-full object-cover", imageClassName)}
         />
       ) : (

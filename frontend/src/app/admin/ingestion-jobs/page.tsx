@@ -182,10 +182,7 @@ function getGarmentHref(garmentId: string) {
 export default function AdminIngestionJobsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-
-  const [activeFilter, setActiveFilter] = useState<StatusFilter>(() =>
-    getNormalizedStatusFilter(searchParams.get("status"))
-  );
+  const activeFilter = getNormalizedStatusFilter(searchParams.get("status"));
 
   const [jobs, setJobs] = useState<IngestionJobRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -193,21 +190,8 @@ export default function AdminIngestionJobsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const nextFilter = getNormalizedStatusFilter(searchParams.get("status"));
-    setActiveFilter((currentFilter) =>
-      currentFilter === nextFilter ? currentFilter : nextFilter
-    );
-  }, [searchParams]);
-
   const handleFilterChange = useCallback((nextFilter: StatusFilter) => {
-    setActiveFilter(nextFilter);
-
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(searchParams.toString());
 
     if (nextFilter === "all") {
       params.delete("status");
@@ -217,11 +201,11 @@ export default function AdminIngestionJobsPage() {
 
     const nextSearch = params.toString();
     const nextUrl = nextSearch
-      ? `${window.location.pathname}?${nextSearch}`
-      : window.location.pathname;
+      ? `/admin/ingestion-jobs?${nextSearch}`
+      : "/admin/ingestion-jobs";
 
-    window.history.replaceState(window.history.state, "", nextUrl);
-  }, []);
+    router.replace(nextUrl, { scroll: false });
+  }, [router, searchParams]);
 
   const loadJobs = useCallback(async () => {
     setIsLoading(true);
@@ -250,8 +234,32 @@ export default function AdminIngestionJobsPage() {
   }, [activeFilter, jobs]);
 
   useEffect(() => {
-    void loadJobs();
-  }, [loadJobs]);
+    let isCancelled = false;
+
+    void Promise.all([listIngestionJobs(), listGarments()])
+      .then(([jobsData, garmentsData]) => {
+        if (isCancelled) {
+          return;
+        }
+
+        const syntheticPendingRows = buildSyntheticPendingRows(garmentsData, jobsData);
+        setJobs([...jobsData, ...syntheticPendingRows]);
+      })
+      .catch((err: unknown) => {
+        if (!isCancelled) {
+          setError(err instanceof Error ? err.message : "Unable to load ingestion jobs.");
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
   const handleRetry = async (job: IngestionJobRow) => {
     if (!job.garmentId) {

@@ -1,8 +1,6 @@
-﻿version: '3.9'
-
 services:
   db:
-    image: postgres:16
+    image: postgres:16.14-bookworm
     container_name: tavaura-db
     ports:
       - '5433:5432'
@@ -13,16 +11,8 @@ services:
     volumes:
       - tavaura_db_data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:7
-    container_name: tavaura-redis
-    ports:
-      - '6379:6379'
-    volumes:
-      - tavaura_redis_data:/data
-
   storage:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: tavaura-storage
     command: server /data --console-address ':9001'
     ports:
@@ -36,6 +26,4 @@ services:
 
 volumes:
   tavaura_db_data:
-  tavaura_redis_data:
   tavaura_storage_data:
-

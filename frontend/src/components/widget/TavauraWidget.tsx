@@ -1,5 +1,8 @@
 ﻿"use client";
 
+/* Storefront and generated preview URLs are runtime-controlled and cannot use next/image safely. */
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 

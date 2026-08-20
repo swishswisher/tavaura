@@ -39,7 +39,6 @@ __pycache__/
 .venv/
 venv/
 env/
-.python-version
 .pytest_cache/
 .mypy_cache/
 worker/avatar_pipeline/smpl/models/
@@ -64,3 +63,4 @@ Thumbs.db
 *.log
 *.tmp
 *.swp
+.tools/

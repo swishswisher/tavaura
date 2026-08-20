@@ -1,5 +1,8 @@
 "use client";
 
+/* Generated try-on previews may be blob or data URLs and intentionally bypass next/image. */
+/* eslint-disable @next/next/no-img-element */
+
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 

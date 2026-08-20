@@ -33,7 +33,7 @@ function redirectToAdminLogin() {
     return;
   }
 
-  window.location.assign("/admin/login");
+  window.location.replace("/admin/login");
 }
 
 function handleMissingToken(): never {

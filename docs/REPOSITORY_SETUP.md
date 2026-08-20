@@ -6,7 +6,7 @@ This document defines what a clean Tavaura checkout needs and which files belong
 
 - .NET SDK matching the repository-root `global.json`
 - Node.js and npm versions compatible with the frontend and SDK package manifests
-- Python matching the worker container/runtime
+- Python matching `.python-version`
 - Docker with Compose for PostgreSQL, MinIO, the API, and the worker
 
 Use committed lockfiles for JavaScript installs:
@@ -26,7 +26,17 @@ dotnet restore backend/Tavaura.sln
 dotnet build backend/Tavaura.sln --no-restore
 ```
 
-Install Python dependencies into a project-specific virtual environment. The current dependency split is documented in `worker/requirements.txt`; Phase 1 will separate runtime dependencies from research and calibration tooling.
+Install Python dependencies into separate project-specific virtual environments:
+
+```powershell
+python -m venv worker/.venv-runtime
+worker/.venv-runtime/Scripts/python.exe -m pip install -r worker/requirements-runtime.txt
+
+python -m venv worker/.venv-rnd
+worker/.venv-rnd/Scripts/python.exe -m pip install -r worker/requirements-rnd.txt
+```
+
+The runtime environment contains only the API, queue, storage, HTTP and image-processing dependencies. The R&D environment contains the heavier SMPL-X, Torch, mesh and offline-rendering toolchain. Do not install the R&D file in the production worker image.
 
 ## Runtime services
 

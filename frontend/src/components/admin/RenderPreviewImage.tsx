@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { ImageOff } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type RenderPreviewImageProps = {
   garmentName: string;
@@ -42,13 +42,10 @@ export function RenderPreviewImage({
   imageClassName,
 }: RenderPreviewImageProps) {
   const normalizedImageUrl = imageUrl?.trim();
-  const [hasImageError, setHasImageError] = useState(false);
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const initials = useMemo(() => getInitials(garmentName), [garmentName]);
-  const shouldShowImage = Boolean(normalizedImageUrl) && !hasImageError;
-
-  useEffect(() => {
-    setHasImageError(false);
-  }, [normalizedImageUrl]);
+  const shouldShowImage =
+    Boolean(normalizedImageUrl) && failedImageUrl !== normalizedImageUrl;
 
   return (
     <div
@@ -61,7 +58,7 @@ export function RenderPreviewImage({
         <img
           src={normalizedImageUrl}
           alt={alt ?? `${garmentName} render preview`}
-          onError={() => setHasImageError(true)}
+          onError={() => setFailedImageUrl(normalizedImageUrl ?? null)}
           className={cx("h-full w-full object-cover", imageClassName)}
         />
       ) : (

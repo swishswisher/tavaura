@@ -34,14 +34,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const isLoginRoute = pathname === "/admin/login";
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [hasToken, setHasToken] = useState(false);
+  const [authState, setAuthState] = useState<"checking" | "authenticated" | "anonymous">(
+    "checking"
+  );
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const token = getToken();
-    setHasToken(Boolean(token));
-    setIsCheckingAuth(false);
+    const nextAuthState = token ? "authenticated" : "anonymous";
+    const frameId = window.requestAnimationFrame(() => setAuthState(nextAuthState));
 
     if (!token && !isLoginRoute) {
       router.replace("/admin/login");
@@ -51,6 +52,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     if (token && isLoginRoute) {
       router.replace("/admin");
     }
+
+    return () => window.cancelAnimationFrame(frameId);
   }, [isLoginRoute, router]);
 
   useEffect(() => {
@@ -67,7 +70,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const handleLogout = () => {
     setIsMobileNavOpen(false);
     removeToken();
-    setHasToken(false);
+    setAuthState("anonymous");
     router.replace("/admin/login");
   };
 
@@ -79,7 +82,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return <>{children}</>;
   }
 
-  if (isCheckingAuth || !hasToken) {
+  if (authState !== "authenticated") {
     return (
       <main className="flex min-h-screen items-center justify-center bg-tavaura-bg px-4">
         <div className="rounded-2xl border border-white/70 bg-white/80 px-5 py-4 text-sm font-medium text-tavaura-ink shadow-tavaura backdrop-blur">

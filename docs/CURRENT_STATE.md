@@ -43,18 +43,18 @@ These decisions are detailed in [the ADR index](decisions/README.md).
 
 | Area | State | Evidence |
 |---|---|---|
-| Root repository | Active Git repository at `007bb3e` | Code verified |
-| Frontend ownership | Stored as gitlink `160000` to `479e25...` | Code verified |
-| Submodule configuration | `.gitmodules` is absent | Code verified |
-| Frontend local files | Present, but not tracked as ordinary root files | Code verified |
-| Lockfiles | Present locally; ignored and not tracked | Code verified |
-| Generated outputs | Many R&D PNG/OBJ artifacts are tracked | Code verified |
-| Backend build artifacts | Compiled/generated artifacts exist in repository history | Code verified |
-| CI/CD | No repository CI workflow | Code verified |
+| Root repository | Active Git repository with Phase 0 and Phase 1.1 checkpoints | Code verified |
+| Frontend ownership | Tracked as ordinary monorepo source; broken gitlink removed | Code verified |
+| Submodule configuration | No submodule is required | Code verified |
+| Frontend local files | Tracked and reconstructable from a clean checkout | Code verified |
+| Lockfiles | Frontend and SDK npm lockfiles are tracked | Code verified |
+| Generated outputs | Routine build and R&D output paths are ignored | Code verified |
+| Backend build artifacts | Removed from the active index; old history is unchanged | Code verified |
+| CI/CD | CI and Dependabot definitions added; first remote run pending | Code verified |
 | App containers | Compose provides infrastructure only | Code verified |
 
-The broken frontend gitlink is a launch blocker because a fresh clone cannot
-reconstruct the current frontend source.
+The fresh-checkout source-ownership blocker is resolved. Rewriting old Git
+history to remove historical binary weight is optional and has not been done.
 
 ## Verification performed
 
@@ -63,9 +63,9 @@ reconstruct the current frontend source.
 - `dotnet build backend/Tavaura.sln --no-restore`
   - zero warnings
   - zero errors
-- `npm run build` in `frontend/`
-  - successful production build
-  - non-fatal warnings for one unused catch variable and raw `<img>` usage
+- `npm run lint` and `npm run build` in `frontend/`
+  - successful Next.js 16.3 production build
+  - clean ESLint run after React 19 rule fixes
 - `npm run build` in `sdk/`
   - TypeScript build successful
 - Python compilation for `worker/app`
@@ -281,12 +281,15 @@ approved.
 
 ## Dependency and licensing state
 
-- Frontend is pinned to Next.js `15.5.6`; it requires immediate security patching
-  and a planned move to the Active LTS line.
-- Backend targets `.NET 8`; move to .NET 10 LTS before launch.
-- Worker pins `requests==2.32.3`; update beyond the known affected version.
-- `minio/minio:latest` is unpinned.
-- SMPL-X/R&D dependencies are not declared in the production requirements file.
+- Frontend is pinned to Next.js `16.3.1` and React `19.2.8`; the npm production
+  and development graphs currently audit clean.
+- Backend targets `.NET 10` with SDK `10.0.302`; primary Microsoft/EF packages
+  are on the current 10.0 servicing line and the NuGet graph audits clean.
+- Worker pins `requests==2.33.1`, `Pillow==12.3.0`, `FastAPI==0.141.1` and
+  `Starlette==1.6.0`; the runtime requirements currently audit clean.
+- PostgreSQL and MinIO Compose images use exact release tags; unused Redis was
+  removed from the local infrastructure stack.
+- Production worker and SMPL-X/R&D dependency files are now separate and pinned.
 - The full SMPL-X model/software is non-commercial by default; commercial
   rights must be confirmed before commercial launch.
 
