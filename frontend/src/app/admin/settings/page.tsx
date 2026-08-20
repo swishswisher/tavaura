@@ -5,8 +5,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Copy,
-  Eye,
-  EyeOff,
   Globe,
   KeyRound,
   Mail,
@@ -58,6 +56,14 @@ function isValidHttpUrl(value: string) {
   try {
     const url = new URL(value);
     return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isValidHttpsUrl(value: string) {
+  try {
+    return new URL(value).protocol === "https:";
   } catch {
     return false;
   }
@@ -119,8 +125,9 @@ export default function AdminSettingsPage() {
   const [isSavingBrand, setIsSavingBrand] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
-  const [apiKey, setApiKey] = useState("");
-  const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
+  const [apiKeyPrefix, setApiKeyPrefix] = useState("");
+  const [apiKeyLastFour, setApiKeyLastFour] = useState("");
+  const [newApiKey, setNewApiKey] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [integrationSuccess, setIntegrationSuccess] = useState<string | null>(null);
   const [integrationError, setIntegrationError] = useState<string | null>(null);
@@ -142,16 +149,16 @@ export default function AdminSettingsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
 
-  const sdkSnippet = useMemo(() => buildSdkSnippet(apiKey), [apiKey]);
-  const maskedApiKey = useMemo(() => {
-    if (apiKey.length <= 8) {
-      return apiKey || "Loading...";
-    }
-
-    return `${apiKey.slice(0, 7)}${"*".repeat(Math.max(8, apiKey.length - 11))}${apiKey.slice(
-      -4
-    )}`;
-  }, [apiKey]);
+  const sdkSnippet = useMemo(
+    () =>
+      newApiKey
+        ? buildSdkSnippet(newApiKey)
+        : "Regenerate the API key to receive a new secret and SDK snippet.",
+    [newApiKey]
+  );
+  const apiKeyDescriptor = apiKeyPrefix
+    ? `${apiKeyPrefix}${"*".repeat(8)}${apiKeyLastFour}`
+    : "No API key generated";
 
   const usageCards = [
     {
@@ -195,7 +202,9 @@ export default function AdminSettingsPage() {
           supportEmail: settings.brandProfile.supportEmail,
           websiteUrl: settings.brandProfile.websiteUrl,
         });
-        setApiKey(settings.integration.apiKey);
+        setApiKeyPrefix(settings.integration.apiKeyPrefix);
+        setApiKeyLastFour(settings.integration.apiKeyLastFour);
+        setNewApiKey("");
         setWebhookUrl(settings.integration.webhookUrl);
         setUsagePlan(settings.usage);
       } catch (err) {
@@ -340,9 +349,13 @@ export default function AdminSettingsPage() {
     setIsRegeneratingApiKey(true);
 
     try {
-      const settings = await regenerateAdminApiKey();
-      setApiKey(settings.integration.apiKey);
-      setIntegrationSuccess("API key regenerated. Update connected clients immediately.");
+      const response = await regenerateAdminApiKey();
+      setNewApiKey(response.apiKey);
+      setApiKeyPrefix(response.settings.integration.apiKeyPrefix);
+      setApiKeyLastFour(response.settings.integration.apiKeyLastFour);
+      setIntegrationSuccess(
+        "API key regenerated. Copy it now; the complete secret will not be shown again."
+      );
     } catch (err) {
       setIntegrationError(err instanceof Error ? err.message : "Unable to regenerate API key.");
     } finally {
@@ -358,8 +371,8 @@ export default function AdminSettingsPage() {
       return;
     }
 
-    if (!isValidHttpUrl(webhookUrl.trim())) {
-      setIntegrationError("Enter a valid webhook URL.");
+    if (!isValidHttpsUrl(webhookUrl.trim())) {
+      setIntegrationError("Enter a valid HTTPS webhook URL.");
       return;
     }
 
@@ -385,8 +398,8 @@ export default function AdminSettingsPage() {
       return;
     }
 
-    if (newPassword.length < 8) {
-      setSecurityError("New password must be at least 8 characters.");
+    if (newPassword.length < 12) {
+      setSecurityError("New password must be at least 12 characters.");
       return;
     }
 
@@ -576,28 +589,32 @@ export default function AdminSettingsPage() {
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 readOnly
-                value={isApiKeyVisible ? apiKey : maskedApiKey}
+                value={apiKeyDescriptor}
                 className="w-full rounded-2xl border border-tavaura-ink/10 bg-white px-4 py-3 font-mono text-sm text-tavaura-ink shadow-sm"
               />
-              <div className="flex gap-2">
+              {newApiKey && (
                 <button
                   type="button"
-                  onClick={() => setIsApiKeyVisible((current) => !current)}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-tavaura-ink/12 bg-white px-4 py-2 text-sm font-semibold text-tavaura-ink transition hover:bg-tavaura-ink/5"
-                >
-                  {isApiKeyVisible ? <EyeOff size={15} /> : <Eye size={15} />}
-                  {isApiKeyVisible ? "Hide" : "Reveal"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void copyToClipboard(apiKey, "API key copied.")}
+                  onClick={() => void copyToClipboard(newApiKey, "API key copied.")}
                   className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-tavaura-ink/12 bg-white px-4 py-2 text-sm font-semibold text-tavaura-ink transition hover:bg-tavaura-ink/5"
                 >
                   <Copy size={15} />
-                  Copy
+                  Copy new key
                 </button>
-              </div>
+              )}
             </div>
+            <p className="text-xs text-tavaura-ink/60">
+              Only the prefix and final four characters are stored for display. A regenerated
+              secret is shown once in this browser session.
+            </p>
+            {newApiKey && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                  Copy this secret now
+                </p>
+                <code className="mt-2 block break-all text-sm text-amber-950">{newApiKey}</code>
+              </div>
+            )}
           </div>
 
           <label className="space-y-2">
@@ -639,7 +656,8 @@ export default function AdminSettingsPage() {
             <button
               type="button"
               onClick={() => void copyToClipboard(sdkSnippet, "SDK snippet copied.")}
-              className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-tavaura-ink px-5 py-3 text-sm font-semibold text-white shadow-tavaura transition hover:bg-tavaura-ink/90"
+              disabled={!newApiKey}
+              className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-tavaura-ink px-5 py-3 text-sm font-semibold text-white shadow-tavaura transition hover:bg-tavaura-ink/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Copy size={15} />
               Copy Snippet

@@ -7,7 +7,7 @@ This document defines what a clean Tavaura checkout needs and which files belong
 - .NET SDK matching the repository-root `global.json`
 - Node.js and npm versions compatible with the frontend and SDK package manifests
 - Python matching `.python-version`
-- Docker with Compose for PostgreSQL, MinIO, the API, and the worker
+- Docker with Compose for local PostgreSQL and MinIO infrastructure
 
 Use committed lockfiles for JavaScript installs:
 
@@ -23,7 +23,7 @@ Restore and build the API from the repository root:
 
 ```powershell
 dotnet restore backend/Tavaura.sln
-dotnet build backend/Tavaura.sln --no-restore
+dotnet test backend/Tavaura.sln --no-restore
 ```
 
 Install Python dependencies into separate project-specific virtual environments:
@@ -40,7 +40,7 @@ The runtime environment contains only the API, queue, storage, HTTP and image-pr
 
 ## Runtime services
 
-The local stack is defined in `docker-compose.yml`. Environment-specific secrets belong in local environment files or a secret manager and must not be committed.
+The local infrastructure stack is defined in `docker-compose.yml`. The API and worker are run separately during development. Environment-specific secrets belong in local environment files or a secret manager and must not be committed.
 
 ## Models and licensed assets
 
@@ -63,12 +63,13 @@ R&D scripts and fixtures remain tracked; their generated outputs do not. Removin
 Before accepting a Phase 1 checkpoint, verify:
 
 ```powershell
-dotnet build backend/Tavaura.sln
+dotnet test backend/Tavaura.sln
 npm --prefix frontend ci
 npm --prefix frontend run build
 npm --prefix sdk ci
 npm --prefix sdk run build
-python -m compileall worker/app
+python -m unittest discover -s worker/tests -v
+python -m compileall worker/app worker/tests
 ```
 
 Worker topology and calibration tests may require separately provisioned licensed model assets. Those tests must report a clear skip or provisioning error when assets are absent rather than silently substituting a different production pipeline.

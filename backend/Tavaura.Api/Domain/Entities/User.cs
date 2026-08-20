@@ -12,6 +12,8 @@ public class User
 
     public string Email { get; set; } = string.Empty;
 
+    public string NormalizedEmail { get; set; } = string.Empty;
+
     public string? DisplayName { get; set; }
 
     public string PasswordHash { get; set; } = string.Empty;
@@ -21,6 +23,12 @@ public class User
     public Guid? TenantId { get; set; }
 
     public int TokenVersion { get; set; }
+
+    public int FailedLoginCount { get; set; }
+
+    public DateTime? LockoutEnd { get; set; }
+
+    public DateTime? LastLoginAt { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

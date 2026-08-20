@@ -195,19 +195,21 @@ async def _process_ingestion_job(
                 """
                 SELECT COALESCE(MAX("VersionNumber"), 0) + 1
                 FROM "AssetVersions"
-                WHERE "GarmentAssetId" = $1
+                WHERE "TenantId" = $1 AND "GarmentAssetId" = $2
                 """,
+                job.tenant_id,
                 garment_asset_id,
             )
 
             await connection.execute(
                 """
                 INSERT INTO "AssetVersions"
-                    ("Id", "GarmentAssetId", "VersionNumber", "ProcessingModel", "CreatedAt")
+                    ("Id", "TenantId", "GarmentAssetId", "VersionNumber", "ProcessingModel", "CreatedAt")
                 VALUES
-                    ($1, $2, $3, $4, $5)
+                    ($1, $2, $3, $4, $5, $6)
                 """,
                 uuid.uuid4(),
+                job.tenant_id,
                 garment_asset_id,
                 next_version_number,
                 PLACEHOLDER_PROCESSING_MODEL,

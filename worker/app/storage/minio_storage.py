@@ -48,9 +48,27 @@ class MinioAssetStorage:
 
     @classmethod
     def from_environment(cls) -> "MinioAssetStorage":
+        is_development = os.getenv("TAVAURA_ENVIRONMENT", "development").lower() == "development"
+        if not is_development:
+            required_names = (
+                "MINIO_ENDPOINT",
+                "MINIO_ACCESS_KEY",
+                "MINIO_SECRET_KEY",
+                "MINIO_BUCKET",
+                "MINIO_PUBLIC_BASE_URL",
+            )
+            missing = [name for name in required_names if not os.getenv(name)]
+            if missing:
+                raise ObjectStorageError(
+                    f"Production object storage configuration is missing: {', '.join(missing)}"
+                )
+
         raw_endpoint = os.getenv("MINIO_ENDPOINT", DEFAULT_MINIO_ENDPOINT)
         endpoint, endpoint_secure = _normalize_endpoint(raw_endpoint)
         secure = _read_bool(os.getenv("MINIO_SECURE"), endpoint_secure)
+        public_base_url = os.getenv("MINIO_PUBLIC_BASE_URL", DEFAULT_MINIO_PUBLIC_BASE_URL)
+        if not is_development and (not secure or not public_base_url.lower().startswith("https://")):
+            raise ObjectStorageError("Production object storage endpoints must use HTTPS.")
 
         return cls(
             endpoint=endpoint,
@@ -58,10 +76,7 @@ class MinioAssetStorage:
             secret_key=os.getenv("MINIO_SECRET_KEY", DEFAULT_MINIO_SECRET_KEY),
             bucket=os.getenv("MINIO_BUCKET", DEFAULT_MINIO_BUCKET),
             secure=secure,
-            public_base_url=os.getenv(
-                "MINIO_PUBLIC_BASE_URL",
-                DEFAULT_MINIO_PUBLIC_BASE_URL,
-            ),
+            public_base_url=public_base_url,
         )
 
     async def upload_bytes(
@@ -140,4 +155,3 @@ def _read_bool(raw_value: str | None, default: bool) -> bool:
         return default
 
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
-

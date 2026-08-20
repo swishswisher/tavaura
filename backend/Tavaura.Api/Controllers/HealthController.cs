@@ -4,6 +4,7 @@ namespace Tavaura.Api.Controllers;
 
 [ApiController]
 [Route("health")]
+[Microsoft.AspNetCore.Authorization.AllowAnonymous]
 public class HealthController : ControllerBase
 {
     [HttpGet]

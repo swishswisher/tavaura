@@ -77,9 +77,9 @@ public class AvatarsController : ControllerBase
         }
 
         var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == request.UserId, cancellationToken);
-        if (user is not null && user.TenantId.HasValue && user.TenantId.Value != tenantId)
+        if (user is null || user.TenantId != tenantId)
         {
-            return BadRequest(new { message = "User does not belong to the tenant." });
+            return BadRequest(new { message = "User does not exist in the tenant." });
         }
 
         if (User.IsInRole(AuthRoles.CustomerUser) &&

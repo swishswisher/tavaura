@@ -156,7 +156,7 @@ async def _process_render_job(
 
     await _store_render_result_and_complete_job(
         pool,
-        job.id,
+        job,
         output_object.url,
         preview_object.url,
     )
@@ -226,16 +226,15 @@ async def _load_avatar_input(
         FROM "Avatars" a
         LEFT JOIN "Users" u ON u."Id" = a."UserId"
         WHERE a."Id" = $1
+          AND a."TenantId" = $2
         LIMIT 1
         """,
         job.avatar_id,
+        job.tenant_id,
     )
 
     if row is None:
         raise ValueError("Avatar does not exist for render job.")
-
-    if row["TenantId"] is not None and row["TenantId"] != job.tenant_id:
-        raise ValueError("Avatar does not belong to the render job tenant.")
 
     source = row["Source"] or ""
     person_image_url = source if _looks_like_url(source) else None
@@ -274,14 +273,18 @@ async def _load_garment_input(
                latest_av."Id" AS "LatestAssetVersionId",
                latest_av."VersionNumber" AS "LatestVersionNumber"
         FROM "GarmentAssets" ga
-        JOIN "Garments" g ON g."Id" = ga."GarmentId"
+        JOIN "Garments" g
+          ON g."Id" = ga."GarmentId"
+         AND g."TenantId" = ga."TenantId"
         LEFT JOIN "AssetVersions" requested_av
           ON requested_av."Id" = $3
+         AND requested_av."TenantId" = ga."TenantId"
          AND requested_av."GarmentAssetId" = ga."Id"
         JOIN LATERAL (
             SELECT "Id", "VersionNumber"
             FROM "AssetVersions"
-            WHERE "GarmentAssetId" = ga."Id"
+            WHERE "TenantId" = ga."TenantId"
+              AND "GarmentAssetId" = ga."Id"
             ORDER BY "VersionNumber" DESC
             LIMIT 1
         ) latest_av ON true
@@ -383,7 +386,7 @@ async def _upload_render_outputs(
 
 async def _store_render_result_and_complete_job(
     pool: asyncpg.Pool,
-    job_id: uuid.UUID,
+    job: ClaimedRenderJob,
     output_url: str,
     preview_url: str,
 ) -> None:
@@ -394,23 +397,25 @@ async def _store_render_result_and_complete_job(
                 """
                 SELECT "Id"
                 FROM "RenderResults"
-                WHERE "RenderJobId" = $1
+                WHERE "TenantId" = $1 AND "RenderJobId" = $2
                 ORDER BY "CreatedAt" DESC
                 LIMIT 1
                 """,
-                job_id,
+                job.tenant_id,
+                job.id,
             )
 
             if existing_result_id is None:
                 await connection.execute(
                     """
                     INSERT INTO "RenderResults"
-                        ("Id", "RenderJobId", "OutputImageUrl", "PreviewImageUrl", "CreatedAt")
+                        ("Id", "TenantId", "RenderJobId", "OutputImageUrl", "PreviewImageUrl", "CreatedAt")
                     VALUES
-                        ($1, $2, $3, $4, $5)
+                        ($1, $2, $3, $4, $5, $6)
                     """,
                     uuid.uuid4(),
-                    job_id,
+                    job.tenant_id,
+                    job.id,
                     output_url,
                     preview_url,
                     now,
@@ -419,12 +424,13 @@ async def _store_render_result_and_complete_job(
                 await connection.execute(
                     """
                     UPDATE "RenderResults"
-                    SET "OutputImageUrl" = $2,
-                        "PreviewImageUrl" = $3,
-                        "CreatedAt" = $4
-                    WHERE "Id" = $1
+                    SET "OutputImageUrl" = $3,
+                        "PreviewImageUrl" = $4,
+                        "CreatedAt" = $5
+                    WHERE "Id" = $1 AND "TenantId" = $2
                     """,
                     existing_result_id,
+                    job.tenant_id,
                     output_url,
                     preview_url,
                     now,
@@ -437,10 +443,11 @@ async def _store_render_result_and_complete_job(
                     "CompletedAt" = $2,
                     "UpdatedAt" = $2,
                     "ErrorMessage" = NULL
-                WHERE "Id" = $1
+                WHERE "Id" = $1 AND "TenantId" = $3
                 """,
-                job_id,
+                job.id,
                 now,
+                job.tenant_id,
             )
 
 

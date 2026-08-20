@@ -27,6 +27,7 @@ conversations:
 - [MVP definition of done](docs/MVP_DEFINITION_OF_DONE.md)
 - [Implementation roadmap](docs/IMPLEMENTATION_ROADMAP.md)
 - [Architecture overview](docs/architecture-overview.md)
+- [Security and tenant enforcement](docs/SECURITY_AND_TENANCY.md)
 - [Decision records](docs/decisions/README.md)
 
 When code, an old document and a decision record disagree, treat the newest

@@ -11,7 +11,7 @@ public class Avatar
 
     public Guid UserId { get; set; }
 
-    public Guid? TenantId { get; set; }
+    public Guid TenantId { get; set; }
 
     public string Source { get; set; } = string.Empty;
 

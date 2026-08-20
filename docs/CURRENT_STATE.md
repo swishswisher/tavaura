@@ -63,12 +63,16 @@ history to remove historical binary weight is optional and has not been done.
 - `dotnet build backend/Tavaura.sln --no-restore`
   - zero warnings
   - zero errors
+- backend security and tenant-isolation suite
+  - 13 tests passed
 - `npm run lint` and `npm run build` in `frontend/`
   - successful Next.js 16.3 production build
   - clean ESLint run after React 19 rule fixes
 - `npm run build` in `sdk/`
   - TypeScript build successful
 - Python compilation for `worker/app`
+- worker safe-image intake suite
+  - 8 tests passed
 - body-estimation tests
 - canonical T-shirt topology test
   - one connected component
@@ -79,8 +83,7 @@ history to remove historical binary weight is optional and has not been done.
 
 ### Known quality gaps
 
-- There is no backend test project.
-- There are no frontend, SDK, API integration or end-to-end tests.
+- There are no frontend, SDK, full API integration or end-to-end tests.
 - Full recursive Python compilation includes legacy Python 2 SMPL research code
   and is not clean.
 - Visual R&D outputs are not governed by measurable commercial-quality gates.
@@ -122,32 +125,29 @@ history to remove historical binary weight is optional and has not been done.
 
 - ASP.NET Core API and EF Core/PostgreSQL configuration
 - JWT issuance and validation with token-version revocation
-- role-based authorization on newer controllers
+- authenticated-by-default controllers with explicit anonymous routes
+- expiring merchant invitations and platform-authorized workspace onboarding
+- login rate limiting, lockout and legacy password-hash upgrade
 - tenants, users, avatars, garments, garment assets and job/result entities
+- one-to-one Account -> Store -> Tenant ownership and membership validation
 - ingestion/render job and result APIs
 - merchant admin dashboard/settings APIs
 - migrations and basic database constraints/indexes
-- tenant predicates in the newer controller queries
+- default-deny tenant query filters, composite pipeline keys and PostgreSQL RLS
+- hashed one-time-display API keys
 
 **Partial**
 
-- account, store and membership ownership entities exist but are not coherently
-  connected to the existing Tenant boundary
-- tenant isolation relies mainly on controller predicates
 - asset versions are numbered but do not contain immutable artifact manifests
 - plan usage is displayed but not enforced
-- API keys and webhook settings are stored but not operational integrations
+- API keys and webhook settings are not yet operational storefront integrations
+- production must provision separate non-owner runtime database roles for RLS
 
-**Critical gaps**
+**Remaining launch gaps**
 
-- unauthenticated merchant registration can assign `merchant_admin` for an
-  existing tenant
-- legacy ingestion/render routes are public
-- remote media downloads permit SSRF
-- no global tenant query filters or PostgreSQL row-level security
-- no unique normalized-email database constraint
-- plaintext API keys are stored and repeatedly returned
-- no rate limiting, invitation flow, MFA, lockout or refresh-token lifecycle
+- MFA and a refresh-token/device-session lifecycle are not implemented
+- storefront session issuance and allowed-origin enforcement are not implemented
+- production runtime roles and network policy still need deployment validation
 
 ### Worker runtime
 
@@ -170,7 +170,7 @@ history to remove historical binary weight is optional and has not been done.
 **Missing**
 
 - job leases, heartbeat, abandoned-job reaper and dead-letter handling
-- safe-download service and network egress restrictions
+- infrastructure-level worker egress restrictions
 - real background removal, segmentation and classification
 - canonical-archetype selection and deformation
 - immutable raw/processed asset manifests and hashes
@@ -272,12 +272,11 @@ Admin/API creates ingestion or render job
   -> PostgreSQL status/result update
 ```
 
-### Broken legacy path
+### Removed legacy path
 
-The backend worker clients POST to `/jobs/ingestion/mock` and
-`/jobs/render/mock`, but FastAPI exposes only `/health`. These legacy routes
-must be removed rather than repaired unless a concrete synchronous use case is
-approved.
+The broken synchronous mock controllers and .NET worker HTTP clients have been
+removed. PostgreSQL job records are the only active API-to-worker coordination
+path.
 
 ## Dependency and licensing state
 
@@ -285,8 +284,8 @@ approved.
   and development graphs currently audit clean.
 - Backend targets `.NET 10` with SDK `10.0.302`; primary Microsoft/EF packages
   are on the current 10.0 servicing line and the NuGet graph audits clean.
-- Worker pins `requests==2.33.1`, `Pillow==12.3.0`, `FastAPI==0.141.1` and
-  `Starlette==1.6.0`; the runtime requirements currently audit clean.
+- Worker pins `Pillow==12.3.0`, `FastAPI==0.141.1` and `Starlette==1.6.0`;
+  remote HTTP intake now uses the standard-library safe-download policy.
 - PostgreSQL and MinIO Compose images use exact release tags; unused Redis was
   removed from the local infrastructure stack.
 - Production worker and SMPL-X/R&D dependency files are now separate and pinned.
@@ -295,6 +294,14 @@ approved.
 
 ## Immediate next phase
 
-Phase 1 is repository and security stabilization. Canonical garment work may
-continue in parallel as a manual R&D activity, but no public MVP deployment is
-allowed until the Phase 1 security and repository exit criteria are met.
+Phase 1 is complete: all production dependency audits are clean, the unit and
+security suites pass, the full migration chain applies to PostgreSQL 16.14,
+and Tenant A/B RLS plus cross-tenant constraints were verified under a
+non-owner runtime role. A representative legacy dataset also upgraded cleanly;
+normalized email, ownership membership, store/asset/result/avatar tenant
+backfills and plaintext API-key removal were asserted after migration.
+
+The execution frontier is now Phase 2: finish and validate the known-good
+canonical T-shirt, record its machine-readable contract, and bridge the
+validated SMPL-X/canonical-garment path toward the runtime provider. Public
+deployment remains blocked by later MVP definition-of-done gates.

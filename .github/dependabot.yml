@@ -16,6 +16,10 @@ updates:
     directory: /backend/Tavaura.Api
     schedule:
       interval: weekly
+  - package-ecosystem: nuget
+    directory: /backend/Tavaura.Api.Tests
+    schedule:
+      interval: weekly
   - package-ecosystem: docker
     directory: /
     schedule:

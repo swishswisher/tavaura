@@ -49,7 +49,7 @@ public class RenderJobsController : ControllerBase
             return BadRequest(new { message = "Avatar does not exist." });
         }
 
-        if (avatar.TenantId.HasValue && avatar.TenantId.Value != tenantId)
+        if (avatar.TenantId != tenantId)
         {
             return BadRequest(new { message = "Avatar does not belong to this tenant." });
         }

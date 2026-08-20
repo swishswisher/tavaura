@@ -5,6 +5,8 @@ namespace Tavaura.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Microsoft.AspNetCore.Authorization.AllowAnonymous]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("public-write")]
 public class ContactController : ControllerBase
 {
     private readonly ILogger<ContactController> _logger;
@@ -26,7 +28,7 @@ public class ContactController : ControllerBase
             });
         }
 
-        if (string.IsNullOrWhiteSpace(request.Email))
+        if (string.IsNullOrWhiteSpace(request.Email) || request.Email.Length > 320)
         {
             return BadRequest(new ContactResponseDto
             {
@@ -35,7 +37,7 @@ public class ContactController : ControllerBase
             });
         }
 
-        if (string.IsNullOrWhiteSpace(request.Message))
+        if (string.IsNullOrWhiteSpace(request.Message) || request.Message.Length > 5000)
         {
             return BadRequest(new ContactResponseDto
             {
@@ -45,12 +47,9 @@ public class ContactController : ControllerBase
         }
 
         _logger.LogInformation(
-            "New contact request from {Email}. Name: {Name}, Company: {Company}, Context: {Context}, Message: {Message}",
-            request.Email,
-            request.Name ?? "(none)",
-            request.CompanyOrBrand ?? "(none)",
-            request.Context ?? "(none)",
-            request.Message
+            "Accepted contact request {RequestId} with context {Context}",
+            HttpContext.TraceIdentifier,
+            request.Context ?? "unspecified"
         );
 
         var response = new ContactResponseDto

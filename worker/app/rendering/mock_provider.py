@@ -5,19 +5,15 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
-import requests
-from PIL import Image, ImageFilter, features
+from PIL import Image, ImageFilter
 
 from app.rendering.base import RenderArtifact, RenderProviderResult, RenderRequest
+from app.services.safe_image_download import SafeImageDownloadError, download_image_sync
 
 
 PNG_CONTENT_TYPE = "image/png"
-DOWNLOAD_TIMEOUT_SECONDS = 30
 NEAR_WHITE_THRESHOLD = 235
 NEAR_WHITE_CHROMA_LIMIT = 30
-VALID_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png"}
-if features.check("webp"):
-    VALID_IMAGE_CONTENT_TYPES.add("image/webp")
 LAYER_ORDER = {
     "innerwear": 10,
     "inner": 10,
@@ -340,34 +336,9 @@ def download_render_image(image_url: str, label: str) -> Image.Image:
         raise ValueError(f"{label.title()} image URL is required.")
 
     try:
-        response = requests.get(image_url, timeout=DOWNLOAD_TIMEOUT_SECONDS)
-    except requests.RequestException as exc:
-        raise RuntimeError(
-            f"Failed to download {label} image. Please check that the image URL is reachable."
-        ) from exc
-
-    raw_content_type = response.headers.get("Content-Type", "")
-    content_type = raw_content_type.split(";", 1)[0].strip().lower()
-    content = response.content
-
-    LOGGER.info(
-        "Downloaded %s image response: url=%s status=%s content_type=%s byte_size=%s",
-        label,
-        image_url,
-        response.status_code,
-        raw_content_type or "missing",
-        len(content),
-    )
-
-    if response.status_code != requests.codes.ok:
-        raise RuntimeError(f"Failed to download {label} image: HTTP {response.status_code}.")
-
-    if not content or content_type not in VALID_IMAGE_CONTENT_TYPES:
-        raise RuntimeError(_invalid_image_message(label))
-
-    try:
-        image = Image.open(BytesIO(content)).convert("RGBA")
-    except Exception as exc:
+        downloaded = download_image_sync(image_url)
+        image = Image.open(BytesIO(downloaded.content)).convert("RGBA")
+    except (SafeImageDownloadError, OSError) as exc:
         raise RuntimeError(_invalid_image_message(label)) from exc
 
     LOGGER.info("Downloaded %s image", label)

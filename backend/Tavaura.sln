@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tavaura.Api", "Tavaura.Api\Tavaura.Api.csproj", "{277100B0-93E3-4C90-9226-C0A2E3110DB6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tavaura.Api.Tests", "Tavaura.Api.Tests\Tavaura.Api.Tests.csproj", "{19F4A8F8-2BE7-4A3B-90A1-34E49E96F1CF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{277100B0-93E3-4C90-9226-C0A2E3110DB6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{277100B0-93E3-4C90-9226-C0A2E3110DB6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{277100B0-93E3-4C90-9226-C0A2E3110DB6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{19F4A8F8-2BE7-4A3B-90A1-34E49E96F1CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{19F4A8F8-2BE7-4A3B-90A1-34E49E96F1CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{19F4A8F8-2BE7-4A3B-90A1-34E49E96F1CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{19F4A8F8-2BE7-4A3B-90A1-34E49E96F1CF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

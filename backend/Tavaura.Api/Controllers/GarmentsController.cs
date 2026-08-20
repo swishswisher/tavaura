@@ -4,32 +4,27 @@ using Microsoft.EntityFrameworkCore;
 using Tavaura.Api.Auth;
 using Tavaura.Api.Data;
 using Tavaura.Api.Domain.Entities;
-using Tavaura.Api.Models;
 using Tavaura.Api.Models.Garments;
 using Tavaura.Api.Tenancy;
-using Tavaura.Api.Worker;
 
 namespace Tavaura.Api.Controllers;
 
 [ApiController]
 [Route("api/garments")]
+[Authorize(Roles = AuthRoles.MerchantOrPlatform)]
 public class GarmentsController : ControllerBase
 {
     private readonly TavauraDbContext _dbContext;
-    private readonly IWorkerIngestionClient _workerIngestionClient;
     private readonly ITenantContext _tenantContext;
 
     public GarmentsController(
         TavauraDbContext dbContext,
-        IWorkerIngestionClient workerIngestionClient,
         ITenantContext tenantContext)
     {
         _dbContext = dbContext;
-        _workerIngestionClient = workerIngestionClient;
         _tenantContext = tenantContext;
     }
 
-    [Authorize(Roles = AuthRoles.MerchantOrPlatform)]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<GarmentResponse>>> ListAsync(CancellationToken cancellationToken)
     {
@@ -48,7 +43,6 @@ public class GarmentsController : ControllerBase
         return Ok(responses);
     }
 
-    [Authorize(Roles = AuthRoles.MerchantOrPlatform)]
     [HttpGet("{garmentId:guid}")]
     public async Task<ActionResult<GarmentResponse>> GetAsync(Guid garmentId, CancellationToken cancellationToken)
     {
@@ -70,7 +64,6 @@ public class GarmentsController : ControllerBase
         return Ok(response);
     }
 
-    [Authorize(Roles = AuthRoles.MerchantOrPlatform)]
     [HttpPost]
     public async Task<ActionResult<GarmentResponse>> CreateAsync(
         [FromBody] CreateGarmentRequest request,
@@ -145,7 +138,6 @@ public class GarmentsController : ControllerBase
         return Created($"/api/garments/{garment.Id}", response);
     }
 
-    [Authorize(Roles = AuthRoles.MerchantOrPlatform)]
     [HttpDelete("{garmentId:guid}")]
     public async Task<IActionResult> DeleteAsync(Guid garmentId, CancellationToken cancellationToken)
     {
@@ -171,77 +163,6 @@ public class GarmentsController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();
-    }
-
-    [HttpPost("ingest")]
-    public async Task<IActionResult> IngestAsync([FromBody] IngestGarmentRequest request, CancellationToken cancellationToken)
-    {
-        if (!_tenantContext.TenantId.HasValue)
-        {
-            return BadRequest(new { message = "Missing tenant context header (X-Tavaura-Tenant)." });
-        }
-
-        var tenantId = _tenantContext.TenantId.Value;
-        var now = DateTime.UtcNow;
-        var garment = await _dbContext.Garments.FirstOrDefaultAsync(
-            g => g.TenantId == tenantId && g.ExternalProductId == request.ExternalProductId,
-            cancellationToken);
-
-        if (garment is not null && garment.IsDeleted)
-        {
-            return Conflict(new { message = "This garment has been deleted and cannot be reactivated by ingestion." });
-        }
-
-        if (garment is null)
-        {
-            garment = new Garment
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                ExternalProductId = request.ExternalProductId,
-                Name = request.Name,
-                Category = request.Category,
-                Layer = request.Layer,
-                SourceImageUrl = request.SourceImageUrl,
-                IsActive = true,
-                IsDeleted = false,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-
-            _dbContext.Garments.Add(garment);
-        }
-        else
-        {
-            garment.Name = request.Name;
-            garment.Category = request.Category;
-            garment.Layer = request.Layer;
-            garment.SourceImageUrl = request.SourceImageUrl;
-            garment.IsActive = true;
-            garment.UpdatedAt = now;
-        }
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        try
-        {
-            await _workerIngestionClient.IngestAsync(
-                tenantId,
-                garment.Id,
-                request.SourceImageUrl,
-                request.ExternalProductId,
-                cancellationToken);
-        }
-        catch (WorkerClientException ex)
-        {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message, id = garment.Id });
-        }
-
-        return Ok(new
-        {
-            id = garment.Id,
-            status = "queued"
-        });
     }
 
     private async Task<IReadOnlyList<GarmentResponse>> BuildGarmentResponsesAsync(

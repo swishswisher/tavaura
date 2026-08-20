@@ -14,7 +14,15 @@ public class MerchantAdminSettings
 
     public string? LogoUrl { get; set; }
 
-    public string ApiKey { get; set; } = string.Empty;
+    public string ApiKeyHash { get; set; } = string.Empty;
+
+    public string ApiKeyPrefix { get; set; } = string.Empty;
+
+    public string ApiKeyLastFour { get; set; } = string.Empty;
+
+    public string ApiKeyScopes { get; set; } = string.Empty;
+
+    public DateTime? ApiKeyCreatedAt { get; set; }
 
     public string WebhookUrl { get; set; } = string.Empty;
 

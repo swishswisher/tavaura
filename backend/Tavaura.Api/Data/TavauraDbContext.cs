@@ -5,9 +5,14 @@ namespace Tavaura.Api.Data;
 
 public class TavauraDbContext : DbContext
 {
-    public TavauraDbContext(DbContextOptions<TavauraDbContext> options)
+    private readonly Tavaura.Api.Tenancy.ITenantContext _tenantContext;
+
+    public TavauraDbContext(
+        DbContextOptions<TavauraDbContext> options,
+        Tavaura.Api.Tenancy.ITenantContext tenantContext)
         : base(options)
     {
+        _tenantContext = tenantContext;
     }
 
     public DbSet<Tenant> Tenants { get; set; } = null!;
@@ -16,6 +21,7 @@ public class TavauraDbContext : DbContext
     public DbSet<Store> Stores { get; set; } = null!;
     public DbSet<MerchantAdminSettings> MerchantAdminSettings { get; set; } = null!;
     public DbSet<User> Users { get; set; } = null!;
+    public DbSet<UserInvitation> UserInvitations { get; set; } = null!;
     public DbSet<Avatar> Avatars { get; set; } = null!;
     public DbSet<AvatarHairStyle> AvatarHairStyles { get; set; } = null!;
     public DbSet<Garment> Garments { get; set; } = null!;
@@ -38,6 +44,7 @@ public class TavauraDbContext : DbContext
         modelBuilder.Entity<Store>().HasKey(s => s.Id);
         modelBuilder.Entity<MerchantAdminSettings>().HasKey(s => s.Id);
         modelBuilder.Entity<User>().HasKey(u => u.Id);
+        modelBuilder.Entity<UserInvitation>().HasKey(i => i.Id);
         modelBuilder.Entity<Avatar>().HasKey(a => a.Id);
         modelBuilder.Entity<AvatarHairStyle>().HasKey(h => h.Id);
         modelBuilder.Entity<Garment>().HasKey(g => g.Id);
@@ -55,6 +62,64 @@ public class TavauraDbContext : DbContext
         modelBuilder.Entity<Garment>()
             .HasIndex(g => new { g.TenantId, g.ExternalProductId })
             .IsUnique();
+
+        modelBuilder.Entity<Garment>()
+            .HasAlternateKey(g => new { g.TenantId, g.Id });
+
+        modelBuilder.Entity<GarmentAsset>()
+            .HasAlternateKey(ga => new { ga.TenantId, ga.Id });
+
+        modelBuilder.Entity<AssetVersion>()
+            .HasAlternateKey(av => new { av.TenantId, av.Id });
+
+        modelBuilder.Entity<Avatar>()
+            .HasAlternateKey(a => new { a.TenantId, a.Id });
+
+        modelBuilder.Entity<RenderJob>()
+            .HasAlternateKey(rj => new { rj.TenantId, rj.Id });
+
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.NormalizedEmail)
+            .IsUnique();
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.Email)
+            .HasMaxLength(320);
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.NormalizedEmail)
+            .HasMaxLength(320);
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.Role)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.PasswordHash)
+            .HasMaxLength(1024);
+
+        modelBuilder.Entity<UserInvitation>()
+            .HasIndex(i => i.TokenHash)
+            .IsUnique();
+
+        modelBuilder.Entity<UserInvitation>()
+            .Property(i => i.TokenHash)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<UserInvitation>()
+            .Property(i => i.Email)
+            .HasMaxLength(320);
+
+        modelBuilder.Entity<UserInvitation>()
+            .Property(i => i.NormalizedEmail)
+            .HasMaxLength(320);
+
+        modelBuilder.Entity<UserInvitation>()
+            .Property(i => i.Role)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<UserInvitation>()
+            .HasIndex(i => new { i.NormalizedEmail, i.AcceptedAt, i.ExpiresAt });
 
         modelBuilder.Entity<Garment>()
             .Property(g => g.IsDeleted)
@@ -85,12 +150,32 @@ public class TavauraDbContext : DbContext
             .HasIndex(s => s.AccountId);
 
         modelBuilder.Entity<Store>()
+            .HasIndex(s => s.TenantId)
+            .IsUnique();
+
+        modelBuilder.Entity<Store>()
             .HasIndex(s => new { s.AccountId, s.Slug })
             .IsUnique();
 
         modelBuilder.Entity<MerchantAdminSettings>()
             .HasIndex(s => s.TenantId)
             .IsUnique();
+
+        modelBuilder.Entity<MerchantAdminSettings>()
+            .Property(s => s.ApiKeyHash)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<MerchantAdminSettings>()
+            .Property(s => s.ApiKeyPrefix)
+            .HasMaxLength(32);
+
+        modelBuilder.Entity<MerchantAdminSettings>()
+            .Property(s => s.ApiKeyLastFour)
+            .HasMaxLength(4);
+
+        modelBuilder.Entity<MerchantAdminSettings>()
+            .Property(s => s.ApiKeyScopes)
+            .HasMaxLength(256);
 
         modelBuilder.Entity<IngestionJob>()
             .HasIndex(ij => new { ij.Status, ij.CreatedAt });
@@ -116,37 +201,55 @@ public class TavauraDbContext : DbContext
         modelBuilder.Entity<GarmentAsset>()
             .HasOne<Garment>()
             .WithMany()
-            .HasForeignKey(ga => ga.GarmentId)
+            .HasForeignKey(ga => new { ga.TenantId, ga.GarmentId })
+            .HasPrincipalKey(g => new { g.TenantId, g.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<UserInvitation>()
+            .HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(i => i.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<UserInvitation>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(i => i.CreatedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<AssetVersion>()
             .HasOne<GarmentAsset>()
             .WithMany()
-            .HasForeignKey(av => av.GarmentAssetId)
+            .HasForeignKey(av => new { av.TenantId, av.GarmentAssetId })
+            .HasPrincipalKey(ga => new { ga.TenantId, ga.Id })
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<RenderJob>()
             .HasOne<GarmentAsset>()
             .WithMany()
-            .HasForeignKey(rj => rj.GarmentAssetId)
+            .HasForeignKey(rj => new { rj.TenantId, rj.GarmentAssetId })
+            .HasPrincipalKey(ga => new { ga.TenantId, ga.Id })
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<RenderJob>()
             .HasOne<Avatar>()
             .WithMany()
-            .HasForeignKey(rj => rj.AvatarId)
+            .HasForeignKey(rj => new { rj.TenantId, rj.AvatarId })
+            .HasPrincipalKey(a => new { a.TenantId, a.Id })
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<RenderJob>()
             .HasOne<AssetVersion>()
             .WithMany()
-            .HasForeignKey(rj => rj.AssetVersionId)
+            .HasForeignKey(rj => new { rj.TenantId, rj.AssetVersionId })
+            .HasPrincipalKey(av => new { av.TenantId, av.Id })
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<RenderResult>()
             .HasOne<RenderJob>()
             .WithMany()
-            .HasForeignKey(rr => rr.RenderJobId)
+            .HasForeignKey(rr => new { rr.TenantId, rr.RenderJobId })
+            .HasPrincipalKey(rj => new { rj.TenantId, rj.Id })
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<AccountUserMembership>()
@@ -165,6 +268,12 @@ public class TavauraDbContext : DbContext
             .HasOne<Account>()
             .WithMany()
             .HasForeignKey(s => s.AccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Store>()
+            .HasOne<Tenant>()
+            .WithOne()
+            .HasForeignKey<Store>(s => s.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<MerchantAdminSettings>()
@@ -187,6 +296,29 @@ public class TavauraDbContext : DbContext
             .ToTable(t => t.HasCheckConstraint(
                 "CK_RenderJobs_Status",
                 "\"Status\" IN ('pending', 'processing', 'completed', 'failed', 'needs_review')"));
+
+        modelBuilder.Entity<MerchantAdminSettings>()
+            .HasQueryFilter(s => s.TenantId == _tenantContext.TenantId);
+        modelBuilder.Entity<Garment>()
+            .HasQueryFilter(g => g.TenantId == _tenantContext.TenantId);
+        modelBuilder.Entity<GarmentAsset>()
+            .HasQueryFilter(ga => ga.TenantId == _tenantContext.TenantId);
+        modelBuilder.Entity<AssetVersion>()
+            .HasQueryFilter(av => av.TenantId == _tenantContext.TenantId);
+        modelBuilder.Entity<IngestionJob>()
+            .HasQueryFilter(ij => ij.TenantId == _tenantContext.TenantId);
+        modelBuilder.Entity<RenderJob>()
+            .HasQueryFilter(rj => rj.TenantId == _tenantContext.TenantId);
+        modelBuilder.Entity<RenderResult>()
+            .HasQueryFilter(rr => rr.TenantId == _tenantContext.TenantId);
+        modelBuilder.Entity<CosmeticProduct>()
+            .HasQueryFilter(cp => cp.TenantId == _tenantContext.TenantId);
+        modelBuilder.Entity<Challenge>()
+            .HasQueryFilter(c => c.TenantId == _tenantContext.TenantId);
+        modelBuilder.Entity<Avatar>()
+            .HasQueryFilter(a => a.TenantId == _tenantContext.TenantId);
+        modelBuilder.Entity<UserLook>()
+            .HasQueryFilter(ul => ul.TenantId == _tenantContext.TenantId);
 
         base.OnModelCreating(modelBuilder);
     }

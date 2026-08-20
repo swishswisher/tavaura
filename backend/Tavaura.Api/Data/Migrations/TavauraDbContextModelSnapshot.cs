@@ -17,7 +17,7 @@ namespace Tavaura.Api.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.1")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -107,6 +107,9 @@ namespace Tavaura.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("VersionNumber")
                         .HasColumnType("integer");
 
@@ -115,6 +118,8 @@ namespace Tavaura.Api.Data.Migrations
                     b.HasIndex("GarmentAssetId", "VersionNumber")
                         .IsUnique()
                         .IsDescending(false, true);
+
+                    b.HasIndex("TenantId", "GarmentAssetId");
 
                     b.ToTable("AssetVersions");
                 });
@@ -159,7 +164,7 @@ namespace Tavaura.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("TenantId")
+                    b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -420,8 +425,6 @@ namespace Tavaura.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GarmentId");
-
                     b.HasIndex("TenantId", "GarmentId");
 
                     b.HasIndex("TenantId", "GarmentId", "AssetType");
@@ -485,9 +488,28 @@ namespace Tavaura.Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ApiKey")
+                    b.Property<DateTime?>("ApiKeyCreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ApiKeyHash")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ApiKeyLastFour")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)");
+
+                    b.Property<string>("ApiKeyPrefix")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ApiKeyScopes")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -571,15 +593,15 @@ namespace Tavaura.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AssetVersionId");
-
-                    b.HasIndex("AvatarId");
-
-                    b.HasIndex("GarmentAssetId");
-
                     b.HasIndex("Status", "CreatedAt");
 
+                    b.HasIndex("TenantId", "AssetVersionId");
+
+                    b.HasIndex("TenantId", "AvatarId");
+
                     b.HasIndex("TenantId", "CreatedAt");
+
+                    b.HasIndex("TenantId", "GarmentAssetId");
 
                     b.ToTable("RenderJobs", t =>
                         {
@@ -615,9 +637,14 @@ namespace Tavaura.Api.Data.Migrations
                     b.Property<Guid>("RenderJobId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("RenderJobId");
+
+                    b.HasIndex("TenantId", "RenderJobId");
 
                     b.ToTable("RenderResults");
                 });
@@ -653,12 +680,18 @@ namespace Tavaura.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
 
                     b.HasIndex("AccountId", "Slug")
                         .IsUnique();
@@ -716,15 +749,32 @@ namespace Tavaura.Api.Data.Migrations
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<int>("FailedLoginCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LockoutEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
 
                     b.Property<string>("Role")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<Guid?>("TenantId")
                         .HasColumnType("uuid");
@@ -737,7 +787,65 @@ namespace Tavaura.Api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("NormalizedEmail")
+                        .IsUnique();
+
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("Tavaura.Api.Domain.Entities.UserInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("NormalizedEmail", "AcceptedAt", "ExpiresAt");
+
+                    b.ToTable("UserInvitations");
                 });
 
             modelBuilder.Entity("Tavaura.Api.Domain.Entities.UserLook", b =>
@@ -763,7 +871,7 @@ namespace Tavaura.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("TenantId")
+                    b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("UserId")
@@ -793,7 +901,8 @@ namespace Tavaura.Api.Data.Migrations
                 {
                     b.HasOne("Tavaura.Api.Domain.Entities.GarmentAsset", null)
                         .WithMany()
-                        .HasForeignKey("GarmentAssetId")
+                        .HasForeignKey("TenantId", "GarmentAssetId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -802,7 +911,8 @@ namespace Tavaura.Api.Data.Migrations
                 {
                     b.HasOne("Tavaura.Api.Domain.Entities.Garment", null)
                         .WithMany()
-                        .HasForeignKey("GarmentId")
+                        .HasForeignKey("TenantId", "GarmentId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -820,19 +930,22 @@ namespace Tavaura.Api.Data.Migrations
                 {
                     b.HasOne("Tavaura.Api.Domain.Entities.AssetVersion", null)
                         .WithMany()
-                        .HasForeignKey("AssetVersionId")
+                        .HasForeignKey("TenantId", "AssetVersionId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Tavaura.Api.Domain.Entities.Avatar", null)
                         .WithMany()
-                        .HasForeignKey("AvatarId")
+                        .HasForeignKey("TenantId", "AvatarId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Tavaura.Api.Domain.Entities.GarmentAsset", null)
                         .WithMany()
-                        .HasForeignKey("GarmentAssetId")
+                        .HasForeignKey("TenantId", "GarmentAssetId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -841,7 +954,8 @@ namespace Tavaura.Api.Data.Migrations
                 {
                     b.HasOne("Tavaura.Api.Domain.Entities.RenderJob", null)
                         .WithMany()
-                        .HasForeignKey("RenderJobId")
+                        .HasForeignKey("TenantId", "RenderJobId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -851,6 +965,27 @@ namespace Tavaura.Api.Data.Migrations
                     b.HasOne("Tavaura.Api.Domain.Entities.Account", null)
                         .WithMany()
                         .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tavaura.Api.Domain.Entities.Tenant", null)
+                        .WithOne()
+                        .HasForeignKey("Tavaura.Api.Domain.Entities.Store", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tavaura.Api.Domain.Entities.UserInvitation", b =>
+                {
+                    b.HasOne("Tavaura.Api.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Tavaura.Api.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

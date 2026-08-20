@@ -18,7 +18,7 @@ namespace Tavaura.Api.Controllers;
 [Authorize(Roles = AuthRoles.MerchantOrPlatform)]
 public class AdminSettingsController : ControllerBase
 {
-    private const int MinimumPasswordLength = 8;
+    private const int MinimumPasswordLength = 12;
     private const long MaxLogoBytes = 2 * 1024 * 1024;
 
     private readonly TavauraDbContext _dbContext;
@@ -123,9 +123,15 @@ public class AdminSettingsController : ControllerBase
         await using var stream = logo.OpenReadStream();
         using var memory = new MemoryStream();
         await stream.CopyToAsync(memory, cancellationToken);
+        var logoBytes = memory.ToArray();
+        var verifiedContentType = GetVerifiedLogoContentType(logoBytes);
+        if (verifiedContentType is null)
+        {
+            return BadRequest(new { message = "Logo must be a valid PNG or JPEG image." });
+        }
 
         context.Value.Settings.LogoUrl =
-            $"data:{logo.ContentType};base64,{Convert.ToBase64String(memory.ToArray())}";
+            $"data:{verifiedContentType};base64,{Convert.ToBase64String(logoBytes)}";
         context.Value.Settings.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -144,9 +150,9 @@ public class AdminSettingsController : ControllerBase
         }
 
         var webhookUrl = request.WebhookUrl.Trim();
-        if (string.IsNullOrWhiteSpace(webhookUrl) || !IsValidHttpUrl(webhookUrl))
+        if (string.IsNullOrWhiteSpace(webhookUrl) || !IsValidHttpsUrl(webhookUrl))
         {
-            return BadRequest(new { message = "A valid webhook URL is required." });
+            return BadRequest(new { message = "A valid HTTPS webhook URL is required." });
         }
 
         context.Value.Settings.WebhookUrl = webhookUrl;
@@ -157,7 +163,7 @@ public class AdminSettingsController : ControllerBase
     }
 
     [HttpPost("api-key/regenerate")]
-    public async Task<ActionResult<AdminSettingsResponse>> RegenerateApiKeyAsync(
+    public async Task<ActionResult<ApiKeyRegenerationResponse>> RegenerateApiKeyAsync(
         CancellationToken cancellationToken)
     {
         var context = await LoadTenantSettingsContextAsync(cancellationToken);
@@ -166,11 +172,24 @@ public class AdminSettingsController : ControllerBase
             return context.Result;
         }
 
-        context.Value.Settings.ApiKey = GenerateApiKey();
-        context.Value.Settings.UpdatedAt = DateTime.UtcNow;
+        var apiKey = GenerateApiKey();
+        var now = DateTime.UtcNow;
+        context.Value.Settings.ApiKeyHash = HashApiKey(apiKey);
+        context.Value.Settings.ApiKeyPrefix = apiKey[..15];
+        context.Value.Settings.ApiKeyLastFour = apiKey[^4..];
+        context.Value.Settings.ApiKeyScopes = "storefront:session:create";
+        context.Value.Settings.ApiKeyCreatedAt = now;
+        context.Value.Settings.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(await BuildResponseAsync(context.Value.Tenant, context.Value.Settings, cancellationToken));
+        return Ok(new ApiKeyRegenerationResponse
+        {
+            ApiKey = apiKey,
+            Settings = await BuildResponseAsync(
+                context.Value.Tenant,
+                context.Value.Settings,
+                cancellationToken)
+        });
     }
 
     [HttpPost("password")]
@@ -185,7 +204,8 @@ public class AdminSettingsController : ControllerBase
         }
 
         if (string.IsNullOrWhiteSpace(request.CurrentPassword) ||
-            !_passwordHasher.VerifyPassword(request.CurrentPassword, user.PasswordHash))
+            _passwordHasher.VerifyPassword(user, request.CurrentPassword) ==
+            Microsoft.AspNetCore.Identity.PasswordVerificationResult.Failed)
         {
             return BadRequest(new { message = "Current password is incorrect." });
         }
@@ -196,7 +216,7 @@ public class AdminSettingsController : ControllerBase
             return BadRequest(new { message = $"New password must be at least {MinimumPasswordLength} characters." });
         }
 
-        user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
+        user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
         user.TokenVersion += 1;
         user.UpdatedAt = DateTime.UtcNow;
 
@@ -270,7 +290,6 @@ public class AdminSettingsController : ControllerBase
                 TenantId = tenantId,
                 SupportEmail = user?.Email ?? string.Empty,
                 WebsiteUrl = tenant.Domain ?? string.Empty,
-                ApiKey = GenerateApiKey(),
                 WebhookUrl = string.Empty,
                 CreatedAt = now,
                 UpdatedAt = now
@@ -352,7 +371,10 @@ public class AdminSettingsController : ControllerBase
             },
             Integration = new AdminIntegrationSettingsResponse
             {
-                ApiKey = settings.ApiKey,
+                ApiKeyPrefix = settings.ApiKeyPrefix,
+                ApiKeyLastFour = settings.ApiKeyLastFour,
+                ApiKeyScopes = settings.ApiKeyScopes,
+                ApiKeyCreatedAt = settings.ApiKeyCreatedAt,
                 WebhookUrl = settings.WebhookUrl
             },
             Usage = new AdminUsagePlanResponse
@@ -368,6 +390,11 @@ public class AdminSettingsController : ControllerBase
     private static string GenerateApiKey()
     {
         return $"tv_live_{Convert.ToHexString(RandomNumberGenerator.GetBytes(24)).ToLowerInvariant()}";
+    }
+
+    private static string HashApiKey(string apiKey)
+    {
+        return Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(apiKey)));
     }
 
     private static int GetMonthlyRenderLimit(string plan)
@@ -398,5 +425,27 @@ public class AdminSettingsController : ControllerBase
     {
         return Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
+
+    private static bool IsValidHttpsUrl(string value)
+    {
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+               uri.Scheme == Uri.UriSchemeHttps;
+    }
+
+    private static string? GetVerifiedLogoContentType(ReadOnlySpan<byte> content)
+    {
+        ReadOnlySpan<byte> pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+        if (content.StartsWith(pngSignature))
+        {
+            return "image/png";
+        }
+
+        if (content.Length >= 3 && content[0] == 0xFF && content[1] == 0xD8 && content[2] == 0xFF)
+        {
+            return "image/jpeg";
+        }
+
+        return null;
     }
 }

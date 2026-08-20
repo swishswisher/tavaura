@@ -1,36 +1,52 @@
 using System.Security.Cryptography;
+using Microsoft.AspNetCore.Identity;
+using Tavaura.Api.Domain.Entities;
 
 namespace Tavaura.Api.Auth;
 
-public class PasswordHasher
+public sealed class PasswordHasher
 {
-    private const int SaltSize = 16;
-    private const int HashSize = 32;
-    private const int Iterations = 100_000;
-    private const string Algorithm = "pbkdf2-sha256";
+    private const string LegacyAlgorithm = "pbkdf2-sha256";
+    private readonly Microsoft.AspNetCore.Identity.PasswordHasher<User> _identityHasher = new();
+    private readonly User _dummyUser = new();
+    private readonly string _dummyHash;
 
-    public string HashPassword(string password)
+    public PasswordHasher()
     {
-        var salt = RandomNumberGenerator.GetBytes(SaltSize);
-        var hash = Rfc2898DeriveBytes.Pbkdf2(
-            password,
-            salt,
-            Iterations,
-            HashAlgorithmName.SHA256,
-            HashSize);
-
-        return $"{Algorithm}.{Iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
+        _dummyHash = _identityHasher.HashPassword(_dummyUser, Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
     }
 
-    public bool VerifyPassword(string password, string passwordHash)
+    public string HashPassword(User user, string password)
     {
-        if (string.IsNullOrWhiteSpace(passwordHash))
+        return _identityHasher.HashPassword(user, password);
+    }
+
+    public PasswordVerificationResult VerifyPassword(User user, string password)
+    {
+        if (IsLegacyHash(user.PasswordHash))
         {
-            return false;
+            return VerifyLegacyPassword(password, user.PasswordHash)
+                ? PasswordVerificationResult.SuccessRehashNeeded
+                : PasswordVerificationResult.Failed;
         }
 
+        return _identityHasher.VerifyHashedPassword(user, user.PasswordHash, password);
+    }
+
+    public void VerifyDummyPassword(string password)
+    {
+        _ = _identityHasher.VerifyHashedPassword(_dummyUser, _dummyHash, password);
+    }
+
+    private static bool IsLegacyHash(string passwordHash)
+    {
+        return passwordHash.StartsWith($"{LegacyAlgorithm}.", StringComparison.Ordinal);
+    }
+
+    private static bool VerifyLegacyPassword(string password, string passwordHash)
+    {
         var parts = passwordHash.Split('.');
-        if (parts.Length != 4 || parts[0] != Algorithm)
+        if (parts.Length != 4 || parts[0] != LegacyAlgorithm)
         {
             return false;
         }

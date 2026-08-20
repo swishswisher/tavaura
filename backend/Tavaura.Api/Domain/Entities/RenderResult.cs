@@ -6,6 +6,8 @@ public class RenderResult
 {
     public Guid Id { get; set; }
 
+    public Guid TenantId { get; set; }
+
     public Guid RenderJobId { get; set; }
 
     public string OutputImageUrl { get; set; } = string.Empty;

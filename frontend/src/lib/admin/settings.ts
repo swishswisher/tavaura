@@ -8,7 +8,10 @@ export type AdminBrandProfile = {
 };
 
 export type AdminIntegrationSettings = {
-  apiKey: string;
+  apiKeyPrefix: string;
+  apiKeyLastFour: string;
+  apiKeyScopes: string;
+  apiKeyCreatedAt: string | null;
   webhookUrl: string;
 };
 
@@ -23,6 +26,11 @@ export type AdminSettingsResponse = {
   brandProfile: AdminBrandProfile;
   integration: AdminIntegrationSettings;
   usage: AdminUsagePlan;
+};
+
+export type ApiKeyRegenerationResponse = {
+  apiKey: string;
+  settings: AdminSettingsResponse;
 };
 
 export type LoginResponse = {
@@ -76,9 +84,10 @@ export async function updateAdminWebhookUrl(webhookUrl: string) {
 }
 
 export async function regenerateAdminApiKey() {
-  return authenticatedFetch<AdminSettingsResponse>("/api/admin/settings/api-key/regenerate", {
-    method: "POST",
-  });
+  return authenticatedFetch<ApiKeyRegenerationResponse>(
+    "/api/admin/settings/api-key/regenerate",
+    { method: "POST" }
+  );
 }
 
 export async function changeAdminPassword(payload: {

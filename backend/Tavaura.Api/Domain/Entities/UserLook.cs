@@ -10,7 +10,7 @@ public class UserLook
 
     public Guid? AvatarId { get; set; }
 
-    public Guid? TenantId { get; set; }
+    public Guid TenantId { get; set; }
 
     public string Mode { get; set; } = string.Empty;
 

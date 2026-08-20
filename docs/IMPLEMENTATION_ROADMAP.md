@@ -29,6 +29,8 @@ Exit criteria:
 
 ## Phase 1 — Repository and security stabilization
 
+Status: **completed and verified 2026-08-20**
+
 This phase precedes public deployment. Canonical-garment design may continue as
 an isolated manual R&D activity.
 
@@ -89,6 +91,20 @@ Phase 1 exit criteria:
 - arbitrary URLs cannot reach private/internal networks
 - fresh clone includes the real frontend and reproducible dependencies
 - automated tenant-isolation tests pass
+
+Verification checkpoint:
+
+- frontend, SDK and backend Release builds pass
+- backend identity/tenant suite: 13 passed
+- worker remote-media security suite: 8 passed
+- frontend, SDK, NuGet and worker production dependency audits: zero known
+  vulnerabilities
+- full migration chain applied to disposable PostgreSQL 16.14
+- representative pre-Phase-1 users, ownership, assets, avatars, jobs and
+  results upgraded with every tenant/membership/email backfill asserted
+- non-owner PostgreSQL role verified Tenant A/B RLS, default-deny behavior and
+  platform system context
+- cross-tenant composite foreign-key insertion was rejected
 
 ## Phase 2 — Known-good canonical T-shirt
 

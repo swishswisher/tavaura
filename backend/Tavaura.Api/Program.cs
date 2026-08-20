@@ -1,44 +1,68 @@
 using System;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Tavaura.Api.Auth;
 using Tavaura.Api.Configuration;
 using Tavaura.Api.Data;
 using Tavaura.Api.Tenancy;
-using Tavaura.Api.Worker;
 
 var builder = WebApplication.CreateBuilder(args);
 
-const string LocalCorsPolicy = "LocalDevelopment";
+const string CorsPolicy = "ConfiguredOrigins";
 
-builder.Services.AddDbContext<TavauraDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<TenantRlsConnectionInterceptor>();
+builder.Services.AddDbContext<TavauraDbContext>((serviceProvider, options) =>
+    options
+        .UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+        .AddInterceptors(serviceProvider.GetRequiredService<TenantRlsConnectionInterceptor>()));
 builder.Services.AddControllers();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddScoped<JwtTokenService>();
-builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection(WorkerOptions.SectionName));
-builder.Services.AddHttpClient<IWorkerIngestionClient, WorkerIngestionClient>((serviceProvider, client) =>
+builder.Services.AddRateLimiter(options =>
 {
-    var options = serviceProvider.GetRequiredService<IOptions<WorkerOptions>>().Value;
-    client.BaseAddress = new Uri(options.BaseUrl);
-});
-builder.Services.AddHttpClient<IWorkerRenderClient, WorkerRenderClient>((serviceProvider, client) =>
-{
-    var options = serviceProvider.GetRequiredService<IOptions<WorkerOptions>>().Value;
-    client.BaseAddress = new Uri(options.BaseUrl);
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
+    options.AddPolicy("public-write", context => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
 });
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(LocalCorsPolicy, policy =>
+    var configuredOrigins = builder.Configuration
+        .GetSection("Cors:AllowedOrigins")
+        .Get<string[]>() ?? [];
+    if (!builder.Environment.IsDevelopment() && configuredOrigins.Length == 0)
     {
-        policy
-            .SetIsOriginAllowed(origin =>
+        throw new InvalidOperationException("Cors:AllowedOrigins is required outside development.");
+    }
+
+    options.AddPolicy(CorsPolicy, policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(origin =>
             {
                 if (string.IsNullOrWhiteSpace(origin))
                 {
@@ -50,10 +74,16 @@ builder.Services.AddCors(options =>
                     return false;
                 }
 
-                return uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase);
-            })
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+                return uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                       configuredOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase);
+            });
+        }
+        else
+        {
+            policy.WithOrigins(configuredOrigins);
+        }
+
+        policy.AllowAnyHeader().AllowAnyMethod();
     });
 });
 
@@ -68,6 +98,11 @@ if (string.IsNullOrWhiteSpace(jwtOptions.Issuer) ||
 if (Encoding.UTF8.GetByteCount(jwtOptions.SigningKey) < 32)
 {
     throw new InvalidOperationException("JWT SigningKey must be at least 32 bytes.");
+}
+
+if (jwtOptions.ExpiresMinutes is < 5 or > 60)
+{
+    throw new InvalidOperationException("JWT ExpiresMinutes must be between 5 and 60 minutes.");
 }
 
 builder.Services
@@ -126,12 +161,18 @@ builder.Services
             }
         };
     });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 var app = builder.Build();
 
 app.UseHttpsRedirection();
-app.UseCors(LocalCorsPolicy);
+app.UseCors(CorsPolicy);
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<TenantContextMiddleware>();
 app.UseAuthorization();

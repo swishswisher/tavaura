@@ -6,6 +6,8 @@ public class AssetVersion
 {
     public Guid Id { get; set; }
 
+    public Guid TenantId { get; set; }
+
     public Guid GarmentAssetId { get; set; }
 
     public int VersionNumber { get; set; }
