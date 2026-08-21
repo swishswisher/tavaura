@@ -26,6 +26,16 @@ builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.AddSingleton<PasswordHasher>();
 builder.Services.AddScoped<JwtTokenService>();
+var authPermitLimit = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 5);
+var authWindowSeconds = builder.Configuration.GetValue("RateLimiting:AuthWindowSeconds", 60);
+var publicWritePermitLimit = builder.Configuration.GetValue("RateLimiting:PublicWritePermitLimit", 10);
+var publicWriteWindowSeconds = builder.Configuration.GetValue("RateLimiting:PublicWriteWindowSeconds", 60);
+if (authPermitLimit <= 0 || authWindowSeconds <= 0 ||
+    publicWritePermitLimit <= 0 || publicWriteWindowSeconds <= 0)
+{
+    throw new InvalidOperationException("Rate-limiting permit limits and windows must be positive.");
+}
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -33,8 +43,8 @@ builder.Services.AddRateLimiter(options =>
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 5,
-            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = authPermitLimit,
+            Window = TimeSpan.FromSeconds(authWindowSeconds),
             QueueLimit = 0,
             AutoReplenishment = true
         }));
@@ -42,8 +52,8 @@ builder.Services.AddRateLimiter(options =>
         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 10,
-            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = publicWritePermitLimit,
+            Window = TimeSpan.FromSeconds(publicWriteWindowSeconds),
             QueueLimit = 0,
             AutoReplenishment = true
         }));
@@ -179,3 +189,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program;

@@ -7,6 +7,7 @@ namespace Tavaura.Api.Controllers;
 [Route("api/[controller]")]
 [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("public-write")]
+[RequestSizeLimit(8 * 1024)]
 public class ContactController : ControllerBase
 {
     private readonly ILogger<ContactController> _logger;

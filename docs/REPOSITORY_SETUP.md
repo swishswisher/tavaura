@@ -26,6 +26,13 @@ dotnet restore backend/Tavaura.sln
 dotnet test backend/Tavaura.sln --no-restore
 ```
 
+Backend PostgreSQL integration tests run automatically when
+`TAVAURA_TEST_ADMIN_CONNECTION` is set. The target database is reset, so always
+use a disposable database and never point this variable at development or
+production data. CI provisions its own PostgreSQL 16.14 service and treats a
+missing connection as a failure. Without the variable, only the fast unit suite
+runs locally and the PostgreSQL tests report explicit skips.
+
 Install Python dependencies into separate project-specific virtual environments:
 
 ```powershell
@@ -65,6 +72,8 @@ Before accepting a Phase 1 checkpoint, verify:
 ```powershell
 dotnet test backend/Tavaura.sln
 npm --prefix frontend ci
+npm --prefix frontend test
+npm --prefix frontend run lint
 npm --prefix frontend run build
 npm --prefix sdk ci
 npm --prefix sdk run build

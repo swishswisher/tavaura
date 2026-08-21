@@ -2,11 +2,11 @@
 
 Status: **canonical implementation snapshot**
 
-Reconciled: **2026-08-20**
+Reconciled: **2026-08-21**
 
-Checkout reviewed: **`007bb3e` on `master`**
+Checkout reviewed: **`master` through the Phase 1 public-launch security gate**
 
-Working tree at verification: **clean before Phase 0 documentation edits**
+Working tree at verification: **Phase 1 implementation verified before its final checkpoint commit**
 
 ## How to read this document
 
@@ -16,7 +16,7 @@ said should exist.
 Evidence labels:
 
 - **Code verified** — inspected in the current checkout.
-- **Test verified** — a relevant build or test was run on 2026-08-20.
+- **Test verified** — a relevant build or test was run on 2026-08-21.
 - **Conversation checkpoint** — established in the project history but not
   independently reproducible from source code alone.
 - **Planned** — accepted direction that is not implemented.
@@ -43,14 +43,14 @@ These decisions are detailed in [the ADR index](decisions/README.md).
 
 | Area | State | Evidence |
 |---|---|---|
-| Root repository | Active Git repository with Phase 0 and Phase 1.1 checkpoints | Code verified |
+| Root repository | Active Git repository with Phase 0 and completed Phase 1 checkpoints | Code verified |
 | Frontend ownership | Tracked as ordinary monorepo source; broken gitlink removed | Code verified |
 | Submodule configuration | No submodule is required | Code verified |
 | Frontend local files | Tracked and reconstructable from a clean checkout | Code verified |
 | Lockfiles | Frontend and SDK npm lockfiles are tracked | Code verified |
 | Generated outputs | Routine build and R&D output paths are ignored | Code verified |
 | Backend build artifacts | Removed from the active index; old history is unchanged | Code verified |
-| CI/CD | CI and Dependabot definitions added; first remote run pending | Code verified |
+| CI/CD | CI runs builds, audits, frontend security tests and real-PostgreSQL API/migration/RLS tests; first remote run pending | Code verified locally |
 | App containers | Compose provides infrastructure only | Code verified |
 
 The fresh-checkout source-ownership blocker is resolved. Rewriting old Git
@@ -58,21 +58,26 @@ history to remove historical binary weight is optional and has not been done.
 
 ## Verification performed
 
-### Passed on 2026-08-20
+### Passed on 2026-08-21
 
 - `dotnet build backend/Tavaura.sln --no-restore`
   - zero warnings
   - zero errors
-- backend security and tenant-isolation suite
-  - 13 tests passed
-- `npm run lint` and `npm run build` in `frontend/`
+- backend unit and real-PostgreSQL security/integration suite
+  - 29 tests passed with zero skips
+  - 13 unit tests and 16 HTTP, migration, legacy-upgrade and RLS tests
+- `npm test`, `npm run lint` and `npm run build` in `frontend/`
+  - 2 public-route security tests passed
   - successful Next.js 16.3 production build
-  - clean ESLint run after React 19 rule fixes
+  - clean ESLint run
 - `npm run build` in `sdk/`
   - TypeScript build successful
 - Python compilation for `worker/app`
 - worker safe-image intake suite
   - 8 tests passed
+- browser verification of the production frontend
+  - invitation-only signup rendered with no console/network errors or overlay
+  - removed `/api/signup` returned 404 and login navigation succeeded
 - body-estimation tests
 - canonical T-shirt topology test
   - one connected component
@@ -81,9 +86,10 @@ history to remove historical binary weight is optional and has not been done.
   - 5,936 vertices
   - 11,868 faces
 
-### Known quality gaps
+### Known quality gaps beyond Phase 1
 
-- There are no frontend, SDK, full API integration or end-to-end tests.
+- The SDK has a build gate but not yet a storefront end-to-end suite; that flow
+  is implemented and tested in Phase 6.
 - Full recursive Python compilation includes legacy Python 2 SMPL research code
   and is not clean.
 - Visual R&D outputs are not governed by measurable commercial-quality gates.
@@ -100,14 +106,13 @@ history to remove historical binary weight is optional and has not been done.
 - admin login flow and authenticated API client utilities
 - shopper widget and SDK demo page
 - photo upload preview and sample garment-selection UI
-- signup route and page
+- static invitation-only access page; no frontend mutation route
 
 **Partial or simulated**
 
 - widget garment previews use missing or demo assets
 - homepage photo processing calls a backend route that is not implemented
 - shopper try-on is not connected to the SMPL-X pipeline
-- signup lead storage is process-local
 - JWT storage uses browser local storage
 
 **Missing**
@@ -294,12 +299,14 @@ path.
 
 ## Immediate next phase
 
-Phase 1 is complete: all production dependency audits are clean, the unit and
-security suites pass, the full migration chain applies to PostgreSQL 16.14,
-and Tenant A/B RLS plus cross-tenant constraints were verified under a
-non-owner runtime role. A representative legacy dataset also upgraded cleanly;
-normalized email, ownership membership, store/asset/result/avatar tenant
-backfills and plaintext API-key removal were asserted after migration.
+Phase 1 is complete and continuously regression-protected: all production
+dependency audits are clean; 29 backend tests, 8 worker tests and 2 frontend
+security tests pass; CI provisions PostgreSQL 16.14 and runs the HTTP,
+migration, legacy-upgrade and RLS suite under a non-owner runtime role. The
+suite covers invitation authorization, email matching, expiry, concurrent
+replay and rollback; anonymous route inventory; Tenant A/B CRUD; login lockout;
+rate limiting; token revocation; one-time API keys; default-deny RLS; platform
+and worker contexts; cross-tenant constraints; and every Phase 1 data backfill.
 
 The execution frontier is now Phase 2: finish and validate the known-good
 canonical T-shirt, record its machine-readable contract, and bridge the

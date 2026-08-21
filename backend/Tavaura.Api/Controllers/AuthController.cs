@@ -19,6 +19,7 @@ namespace Tavaura.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[RequestSizeLimit(16 * 1024)]
 public class AuthController : ControllerBase
 {
     private static readonly Regex SlugPattern = new(
@@ -329,20 +330,33 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = "A valid invitation token is required." });
         }
 
+        var normalizedEmail = NormalizeEmailKey(request.Email);
+        if (string.IsNullOrWhiteSpace(normalizedEmail) || !IsValidEmail(NormalizeEmail(request.Email)))
+        {
+            return BadRequest(new { message = "A valid invitation email is required." });
+        }
+
         if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < MinimumPasswordLength)
         {
             return BadRequest(new { message = $"Password must be at least {MinimumPasswordLength} characters." });
         }
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable,
+            IsolationLevel.ReadCommitted,
             cancellationToken);
 
         var now = DateTime.UtcNow;
         var tokenHash = HashInvitationToken(request.Token.Trim());
         var invitation = await _dbContext.UserInvitations
-            .SingleOrDefaultAsync(i => i.TokenHash == tokenHash, cancellationToken);
+            .FromSqlInterpolated(
+                $"""SELECT * FROM "UserInvitations" WHERE "TokenHash" = {tokenHash} FOR UPDATE""")
+            .SingleOrDefaultAsync(cancellationToken);
         if (invitation is null || invitation.AcceptedAt.HasValue || invitation.ExpiresAt <= now)
+        {
+            return BadRequest(new { message = "Invitation is invalid or has expired." });
+        }
+
+        if (!string.Equals(invitation.NormalizedEmail, normalizedEmail, StringComparison.Ordinal))
         {
             return BadRequest(new { message = "Invitation is invalid or has expired." });
         }

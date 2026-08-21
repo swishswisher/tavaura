@@ -1,97 +1,30 @@
-"use client";
-
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-
-function SignupPageContent() {
-  const searchParams = useSearchParams();
-  const source = searchParams.get("from") ?? undefined;
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-
-    if (!email || !email.includes("@")) {
-      setError("Please enter a valid email.");
-      return;
-    }
-
-    setStatus("submitting");
-    try {
-      const res = await fetch("/api/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, from: source }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        setError(data?.error ?? "Something went wrong. Please try again.");
-        setStatus("error");
-        return;
-      }
-
-      setEmail("");
-      setStatus("success");
-    } catch {
-      setError("Network error. Please try again.");
-      setStatus("error");
-    }
-  };
-
+export default function SignupPage() {
   return (
     <main className="min-h-screen bg-tavaura-bg px-4 py-12 sm:px-6 lg:px-10 lg:py-16">
       <div className="mx-auto w-full max-w-3xl space-y-6 sm:space-y-8">
         <div className="space-y-3">
           <h1 className="text-3xl font-semibold tracking-tight text-tavaura-ink sm:text-4xl">
-            Create your Tavaura account
+            Tavaura access is invitation-only
           </h1>
           <p className="max-w-2xl text-sm sm:text-base text-tavaura-ink/75">
-            Save avatars, outfits, and cosmetics to your Tavaura account and pick up where you left off across stores.
+            Merchant workspaces are created by the Tavaura platform team. An
+            administrator will send a secure, expiring invitation to your work
+            email when your workspace is ready.
           </p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="tavaura-glass-soft rounded-3xl px-5 py-6 shadow-tavaura sm:px-6 sm:py-7"
-        >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-3">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@brand.com"
-              className="w-full rounded-xl border border-tavaura-ink/15 bg-white px-4 py-3 text-sm text-tavaura-ink shadow-sm outline-none transition focus:border-tavaura-ink focus:ring-1 focus:ring-tavaura-ink sm:flex-1"
-            />
-            <button
-              type="submit"
-              disabled={status === "submitting"}
-              className="rounded-full bg-tavaura-ink px-5 py-3 text-sm font-semibold text-tavaura-white shadow-sm transition hover:bg-tavaura-ink/90 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {status === "submitting" ? "Saving..." : "Continue"}
-            </button>
-          </div>
-          <p className="mt-3 text-xs text-tavaura-ink/70">
-            Use your work or brand email. We’ll use it to create your Tavaura account and send important updates.
+        <div className="tavaura-glass-soft rounded-3xl px-5 py-6 shadow-tavaura sm:px-6 sm:py-7">
+          <p className="text-sm text-tavaura-ink/75">
+            Already invited or already have an account?
           </p>
-          {status === "success" && (
-            <p className="mt-2 text-sm text-emerald-500">
-              You’re in. We’ll email you details about your Tavaura account.
-            </p>
-          )}
-          {error && (
-            <p className="mt-2 text-sm text-rose-500">
-              {error}
-            </p>
-          )}
-        </form>
+          <Link
+            href="/admin/login"
+            className="mt-4 inline-flex rounded-full bg-tavaura-ink px-5 py-3 text-sm font-semibold text-tavaura-white shadow-sm transition hover:bg-tavaura-ink/90"
+          >
+            Sign in to your workspace
+          </Link>
+        </div>
 
         <div className="text-sm text-tavaura-ink/70">
           <Link href="/" className="underline hover:text-tavaura-ink">
@@ -100,23 +33,5 @@ function SignupPageContent() {
         </div>
       </div>
     </main>
-  );
-}
-
-export default function SignupPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen bg-tavaura-bg px-4 py-12 sm:px-6 lg:px-10 lg:py-16">
-          <div className="mx-auto w-full max-w-3xl">
-            <div className="tavaura-glass-soft rounded-3xl px-5 py-6 text-sm text-tavaura-ink shadow-tavaura sm:px-6 sm:py-7">
-              Loading signup...
-            </div>
-          </div>
-        </main>
-      }
-    >
-      <SignupPageContent />
-    </Suspense>
   );
 }

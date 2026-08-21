@@ -10,6 +10,9 @@ Status: **Phase 1 implementation contract**
 - Merchant self-registration is disabled. A platform administrator creates an
   Account, its Store and the Store's one-to-one Tenant partition atomically,
   then issues an expiring single-use invitation.
+- Invitation acceptance requires the original invited email as well as the
+  one-time token. The invitation row is locked transactionally so concurrent
+  replay produces one user/membership and a deterministic rejection.
 - Merchant login requires both the tenant claim and an active account
   membership for the Store mapped to that tenant.
 - Passwords use ASP.NET Core Identity hashing. Legacy PBKDF2-SHA256 values are
@@ -20,6 +23,27 @@ Status: **Phase 1 implementation contract**
   timed lockout.
 - API-key secrets are hashed at rest. The full value is returned only by the
   regeneration response and is never returned by settings reads.
+- The frontend exposes no route-handler mutation API. Its signup page is a
+  static invitation-only explanation linking existing users to merchant login.
+
+## Automated security contract
+
+Pull requests and pushes run the security contract against PostgreSQL 16.14.
+The suite uses separate migration-owner and non-owner application credentials
+and fails CI if PostgreSQL integration is not configured. It verifies:
+
+- all privileged controller endpoints reject anonymous callers;
+- the complete anonymous-route allowlist and production bootstrap behavior;
+- invitation authorization, expiry, email matching, rollback and concurrent
+  replay rejection;
+- Tenant A/B list, detail, create, update and delete isolation;
+- EF default-deny filters, PostgreSQL RLS, platform/worker contexts and
+  composite cross-tenant foreign keys;
+- fresh migrations and representative legacy backfills;
+- login lockout, authentication/public-write limits, token revocation and
+  API-key one-time disclosure;
+- removal of frontend mutation route handlers; and
+- the worker's malicious and invalid remote-image cases.
 
 ## Tenant boundary
 

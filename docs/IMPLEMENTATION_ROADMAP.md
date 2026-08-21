@@ -29,7 +29,7 @@ Exit criteria:
 
 ## Phase 1 — Repository and security stabilization
 
-Status: **completed and verified 2026-08-20**
+Status: **completed and public-launch security gate verified 2026-08-21**
 
 This phase precedes public deployment. Canonical-garment design may continue as
 an isolated manual R&D activity.
@@ -67,7 +67,8 @@ an isolated manual R&D activity.
 
 ### 1.4 Protect remote media intake
 
-- create one safe-download policy for .NET and Python
+- route every production remote fetch through the worker safe-download policy;
+  the .NET API must not fetch remote media
 - restrict schemes, addresses, redirects, bytes, pixels, MIME types and timeouts
 - prefer direct upload or signed known-storage URLs
 - restrict worker outbound networking
@@ -87,7 +88,8 @@ an isolated manual R&D activity.
 Phase 1 exit criteria:
 
 - no critical dependency finding in the production dependency graph
-- no unauthenticated privileged/mutation route
+- no unauthenticated privileged route; intended anonymous writes are explicit,
+  bounded and rate-limited
 - arbitrary URLs cannot reach private/internal networks
 - fresh clone includes the real frontend and reproducible dependencies
 - automated tenant-isolation tests pass
@@ -95,7 +97,8 @@ Phase 1 exit criteria:
 Verification checkpoint:
 
 - frontend, SDK and backend Release builds pass
-- backend identity/tenant suite: 13 passed
+- backend unit and PostgreSQL integration suite: 29 passed with zero skips
+- frontend public-route security suite: 2 passed
 - worker remote-media security suite: 8 passed
 - frontend, SDK, NuGet and worker production dependency audits: zero known
   vulnerabilities
@@ -105,6 +108,15 @@ Verification checkpoint:
 - non-owner PostgreSQL role verified Tenant A/B RLS, default-deny behavior and
   platform system context
 - cross-tenant composite foreign-key insertion was rejected
+- invitation creation authorization, expiry, email matching, concurrent replay
+  rejection and rollback are HTTP integration-tested
+- every privileged controller route is enumerated and verified to return
+  `401`/`403` anonymously; the production-only bootstrap behavior is tested
+- Tenant A/B list, detail, create, update and delete behavior is API-tested
+- login lockout, both rate-limit policies, token revocation and one-time API-key
+  storage/response behavior are API-tested
+- the public process-local signup mutation was removed and is guarded by a
+  frontend regression test plus browser verification
 
 ## Phase 2 — Known-good canonical T-shirt
 
