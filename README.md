@@ -9,27 +9,11 @@ composited images, followed by optional progressive realism enhancement.
 
 ## Repository structure
 
-- `frontend/`: Next.js marketing site, merchant administration and shopper UI
-- `backend/`: multi-tenant ASP.NET Core control plane and system of record
-- `worker/`: Python ingestion, rendering and offline SMPL-X/garment research
-- `sdk/`: standalone embeddable storefront SDK
-- `shared/`: reserved for stable cross-language contracts
-- `tests/`: reserved for cross-service integration and end-to-end tests
-- `docs/`: canonical product, architecture and delivery documentation
+- rontend/: Next.js marketing site and interactive viewer UI
+- ackend/: Multi-tenant .NET 8 Web API handling sessions, catalog, and integrations
+- worker/: Python FastAPI services for ML processing and media pipelines
+- sdk/: Lightweight embeddable JavaScript loader and integration helpers for client sites
+- shared/: Common DTOs, validation schemas, and configuration contracts
+- 	ests/: End-to-end and integration test harnesses
+- docs/: Architecture decision records, diagrams, and other documentation
 
-## Canonical project documents
-
-These files supersede conflicting or outdated plans from earlier development
-conversations:
-
-- [Current implementation state](docs/CURRENT_STATE.md)
-- [Repository setup and clean-checkout contract](docs/REPOSITORY_SETUP.md)
-- [MVP definition of done](docs/MVP_DEFINITION_OF_DONE.md)
-- [Implementation roadmap](docs/IMPLEMENTATION_ROADMAP.md)
-- [Architecture overview](docs/architecture-overview.md)
-- [Security and tenant enforcement](docs/SECURITY_AND_TENANCY.md)
-- [Decision records](docs/decisions/README.md)
-
-When code, an old document and a decision record disagree, treat the newest
-accepted decision record as the intended direction and `CURRENT_STATE.md` as
-the description of what is actually implemented.
