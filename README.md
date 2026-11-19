@@ -14,6 +14,6 @@ composited images, followed by optional progressive realism enhancement.
 - worker/: Python FastAPI services for ML processing and media pipelines
 - sdk/: Lightweight embeddable JavaScript loader and integration helpers for client sites
 - shared/: Common DTOs, validation schemas, and configuration contracts
-- 	ests/: End-to-end and integration test harnesses
+- tests/: End-to-end and integration test harnesses
 - docs/: Architecture decision records, diagrams, and other documentation
 
