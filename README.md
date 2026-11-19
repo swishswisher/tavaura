@@ -9,7 +9,7 @@ composited images, followed by optional progressive realism enhancement.
 
 ## Repository structure
 
-- frontend/: Next.js marketing site and interactive viewer UI
+- frontend/: Next.js marketing site and interactive viewer UI
 - backend/: Multi-tenant .NET 8 Web API handling sessions, catalog, and integrations
 - worker/: Python FastAPI services for ML processing and media pipelines
 - sdk/: Lightweight embeddable JavaScript loader and integration helpers for client sites
