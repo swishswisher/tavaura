@@ -30,7 +30,7 @@ jobs:
         Host=localhost;Port=5432;Database=tavaura_phase1_tests;Username=postgres;Password=postgres
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - run: dotnet restore backend/Tavaura.sln
