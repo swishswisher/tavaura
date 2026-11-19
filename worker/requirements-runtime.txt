@@ -1,6 +1,6 @@
 # Production worker/FastAPI runtime. Keep exact versions for repeatable installs.
 asyncpg==0.30.0
-fastapi==0.141.1
+fastapi==0.163.1
 minio==7.2.15
 pillow==12.3.0
 starlette==1.6.0
