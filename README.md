@@ -9,8 +9,8 @@ composited images, followed by optional progressive realism enhancement.
 
 ## Repository structure
 
-- rontend/: Next.js marketing site and interactive viewer UI
-- ackend/: Multi-tenant .NET 8 Web API handling sessions, catalog, and integrations
+- frontend/: Next.js marketing site and interactive viewer UI
+- backend/: Multi-tenant .NET 8 Web API handling sessions, catalog, and integrations
 - worker/: Python FastAPI services for ML processing and media pipelines
 - sdk/: Lightweight embeddable JavaScript loader and integration helpers for client sites
 - shared/: Common DTOs, validation schemas, and configuration contracts
