@@ -3,5 +3,5 @@ asyncpg==0.30.0
 fastapi==0.141.1
 minio==7.2.15
 pillow==12.3.0
-starlette==1.6.0
+starlette==1.10.0
 uvicorn[standard]==0.35.0
